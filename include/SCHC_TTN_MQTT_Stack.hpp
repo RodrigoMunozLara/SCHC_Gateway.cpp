@@ -3,7 +3,9 @@
 
 #include "SCHC_Stack_L2.hpp"
 #include <cstdint>
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 class SCHC_TTN_MQTT_Stack: public SCHC_Stack_L2
 {

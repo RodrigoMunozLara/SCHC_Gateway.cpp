@@ -5,7 +5,9 @@
 #include <cstdio>
 #include <cstddef>
 #include <cstdint>
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <bitset>
 #include <thread>
 #include <sstream>

@@ -4,7 +4,11 @@
 #include <cstdint>
 #include <nlohmann/json.hpp>
 #include <string>
+
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 #include <iostream>
 
 using json = nlohmann::json;

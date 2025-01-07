@@ -6,11 +6,12 @@
 #include "SCHC_TTN_MQTT_Stack.hpp"
 #include "SCHC_Session_GW.hpp"
 #include <cstdint>
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <mosquitto.h>
 #include "SCHC_ThreadSafeQueue.hpp"
 #include "SCHC_TTN_Parser.hpp"
-
 
 
 class SCHC_Fragmenter_GW

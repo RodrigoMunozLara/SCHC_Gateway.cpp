@@ -29,11 +29,10 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
             // save and print decoded buffer (text format)
             _decoded_payload = base64_decode(frm_payload);
             SPDLOG_DEBUG("Decoded Payload (string format): {}", _decoded_payload);
-            SPDLOG_DEBUG("Decoded Payload (hex format): {:x}", _decoded_payload);
 
             // save and print decoded buffer (hex format)
             const char* decoded_char_payload = _decoded_payload.c_str();
-            int len = _decoded_payload.length();
+            int len = _decoded_payload.size();
 
             char buff[4*len];
             int posicion = 0;
@@ -43,7 +42,7 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
                 posicion += bytes_escritos;
             }
             SPDLOG_DEBUG("Decoded Payload (hex format): {}", (char*)buff);
-
+            
             _len = _decoded_payload.length();
             SPDLOG_DEBUG("Length: {}", _len);
         }

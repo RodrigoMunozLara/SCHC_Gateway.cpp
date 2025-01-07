@@ -10,7 +10,6 @@
 #include "SimpleIni.h"
 #include "SCHC_Fragmenter_GW.hpp"
 
-
 //Global variables
 const char* topic_1_char;
 const char *host;
@@ -33,10 +32,14 @@ int main() {
         return 1;
     }
 
-    // Log format and level
-    auto logger = spdlog::stdout_color_mt("console");
-    spdlog::set_default_logger(logger);
+    // Crear el logger para la consola
+    auto console_logger = spdlog::stdout_color_mt("console");
+    spdlog::set_default_logger(console_logger);
+
+    // Establecer el patrón de salida
     spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+
+    // Configurar el nivel de log
     std::string log_level = std::string(ini.GetValue("logging", "log_level", "Desconocido"));
     if(log_level.compare("TRACE") == 0)
     {
@@ -73,9 +76,9 @@ int main() {
         spdlog::set_level(spdlog::level::err);
         SPDLOG_CRITICAL("Using SPDLOG parameter - log level: OFF");
     }
-
+    
     // MQTT parameters
-    host        = ini.GetValue("mqtt", "host", "Desconocido");
+    host                    = ini.GetValue("mqtt", "host", "Desconocido");
     const char *port_char   = ini.GetValue("mqtt", "port", "Desconocido");
     const int port          = std::stoi(port_char);
     const char *username    = ini.GetValue("mqtt", "username", "Desconocido");
@@ -145,7 +148,7 @@ void on_connect(struct mosquitto *mosq, void *obj, int rc) {
 
 
 void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg) {
-    //SPDLOG_INFO("Received message on topic: {} --> {}", msg->topic, static_cast<char*>(msg->payload));
+    SPDLOG_DEBUG("Received message on topic: {} --> {}", msg->topic, static_cast<char*>(msg->payload));
 
     if (msg->payloadlen > 0)
     {

@@ -6,7 +6,9 @@
 #include "SCHC_State_Machine.hpp"
 #include "SCHC_Stack_L2.hpp"
 #include "SCHC_ThreadSafeQueue.hpp"
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <mosquitto.h>
 #include <thread>
 #include <sstream>

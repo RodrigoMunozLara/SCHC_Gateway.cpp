@@ -4,11 +4,16 @@
 #include "SCHC_Macros.hpp"
 #include "SCHC_State_Machine.hpp"
 #include "SCHC_Message.hpp"
+
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 #include <math.h>
 #include <cstdint>
 #include <thread>
 #include <sstream>
+
 
 class SCHC_Ack_on_error: public SCHC_State_Machine
 {

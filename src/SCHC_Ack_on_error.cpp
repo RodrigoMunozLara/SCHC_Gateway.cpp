@@ -1,6 +1,5 @@
 #include "SCHC_Ack_on_error.hpp"
 
-
 SCHC_Ack_on_error::SCHC_Ack_on_error()
 {
 }
@@ -92,7 +91,9 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
     if(decoder.get_msg_type() == SCHC_REGULAR_FRAGMENT_MSG)
     {
         SPDLOG_INFO("Receiving a SCHC Regular fragment");
-        SPDLOG_WARN("|-----W=");
+        std::string schc_payload = decoder.get_schc_payload();
+        int tiles_in_payload = schc_payload.size()/_tileSize;
+        SPDLOG_WARN("|-----W={:<1}, FCN={:<2}----->| {:>2} tiles recv", decoder.get_w(), decoder.get_fcn(), tiles_in_payload);
 
     }
 
