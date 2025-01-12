@@ -20,11 +20,11 @@ class SCHC_Fragmenter_GW
         uint8_t     set_mqtt_stack(mosquitto* mosqStack);
         uint8_t     initialize(uint8_t protocol);
         uint8_t     listen_messages(char *buffer);
+    private:
         int         get_free_session_id(uint8_t direction);
         uint8_t     associate_session_id(std::string deviceId, int sessionId);
         uint8_t     disassociate_session_id(std::string deviceId);
         int         get_session_id(std::string deviceId);
-    private:
         uint8_t                                 _protocol;
         SCHC_Session_GW                         _uplinkSessionPool[_SESSION_POOL_SIZE];
         SCHC_Session_GW                         _downlinkSessionPool[_SESSION_POOL_SIZE];

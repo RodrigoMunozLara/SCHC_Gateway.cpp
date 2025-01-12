@@ -8,12 +8,12 @@
 
 class SCHC_ThreadSafeQueue {
     public:
-        void push(int rule_id, std::string mesg, int len);
-        bool pop(int& rule_id, std::string& mesg, int& len);
+        void push(std::string dev_id, int rule_id, char* mesg, int len);
+        bool pop(std::string& dev_id, int& rule_id, char*& mesg, int& len);
         bool empty();
         size_t size();
     private:
-        std::queue<std::tuple<int, std::string, int>> _queue;
+        std::queue<std::tuple<std::string, int, char*, int>> _queue;
         std::mutex _mutex;
 };
 #endif

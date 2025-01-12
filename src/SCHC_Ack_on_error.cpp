@@ -8,48 +8,49 @@ SCHC_Ack_on_error::~SCHC_Ack_on_error()
 {
 }
 
-uint8_t SCHC_Ack_on_error::init(uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t ackMode, SCHC_Stack_L2 *stack_ptr, int retTimer, uint8_t ackReqAttempts)
+uint8_t SCHC_Ack_on_error::init(uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t m, uint8_t ackMode, SCHC_Stack_L2 *stack_ptr, int retTimer, uint8_t ackReqAttempts)
 {
     SPDLOG_TRACE("Entering the function");
 
     /* Static SCHC parameters */
-    _ruleID = ruleID;
-    _dTag = dTag;
-    _windowSize = windowSize;
-    _nMaxWindows = pow(2,n);
-    _nFullTiles = 0;                // in tiles
-    _lastTileSize = 0;              // in bytes
-    _tileSize = tileSize;           // in bytes
-    _ackMode = ackMode;
-    _retransTimer = retTimer;       // in millis
-    _maxAckReq = ackReqAttempts;
+    _ruleID = ruleID;                       // Rule ID -> https://www.rfc-editor.org/rfc/rfc9011.html#name-ruleid-management
+    _dTag = dTag;                           // not used in LoRaWAN
+    _windowSize = windowSize;               // in tiles. In LoRaWAN: 63
+    _nMaxWindows = pow(2,m);                // In LoRaWAN: 4
+    _nTotalTiles = windowSize * pow(2,m);   // in tiles. In LoRaWAN: 252
+    _lastTileSize = 0;                      // in bits
+    _tileSize = tileSize;                   // in bytes. In LoRaWAN: 10 bytes
+    _ackMode = ackMode;                     // Modes defined in SCHC_Macros.hpp
+    _retransTimer = retTimer;               // in minutes. In LoRaWAN: 12*60*60 minutes
+    _maxAckReq = ackReqAttempts;            // in minutes. In LoRaWAN: 12*60*60 minutes
 
     /* Static LoRaWAN parameters*/
     _current_L2_MTU = stack_ptr->getMtu(true);
     _stack = stack_ptr;
 
+    _currentState = STATE_RX_INIT;
+
+    /* Reserving memory for the Tails Array*/
+    for(int i=0; i<_nMaxWindows; i++)
+    {
+        for(int j=(_windowSize-1); j>=0; j--)
+        {
+            _tiles_map[{i,j}] = new char[_tileSize];
+        }
+    }
+
+    /* Reserving memory for the Bitmap Array*/
+    for(int i=0; i<_nMaxWindows; i++)
+    {
+        for(int j=(_windowSize-1); j>=0; j--)
+        {
+            _bitmap_map[{i,j}] = 0;
+        }
+    }
+
     SPDLOG_TRACE("Leaving the function");
 
     return 0;
-}
-
-uint8_t SCHC_Ack_on_error::start(int rule_id, char *buffer, int len)
-{
-    SPDLOG_TRACE("Entering the function");
-
-    /* Dynamic SCHC parameters */
-    _currentState = STATE_RX_INIT;
-    _currentWindow = 0;
-    _currentFcn = (_windowSize)-1;
-    _currentBitmap_ptr = 0;
-    _currentTile_ptr = 0;
-
-    uint8_t res;
-    res = this->execute_machine(rule_id, buffer, len);
-
-    SPDLOG_TRACE("Leaving the function");
-
-    return res;
 }
 
 uint8_t SCHC_Ack_on_error::execute_machine(int rule_id, char *msg, int len)
@@ -76,10 +77,19 @@ uint8_t SCHC_Ack_on_error::execute_machine(int rule_id, char *msg, int len)
     return 0;
 }
 
+void SCHC_Ack_on_error::set_device_id(std::string dev_id)
+{
+    _dev_id = dev_id;
+}
+
 uint8_t SCHC_Ack_on_error::RX_INIT_recv_fragments(int rule_id, char *msg, int len)
 {
     SPDLOG_INFO("Changing STATE: From STATE_RX_INIT --> STATE_RX_RCV_WINDOW");
     this->_currentState = STATE_RX_RCV_WINDOW;
+
+    _last_window_received = 0;
+    _last_fcn_received = (_windowSize)-1;
+
     this->execute_machine(rule_id, msg, len);
     return 0;
 }
@@ -87,20 +97,89 @@ uint8_t SCHC_Ack_on_error::RX_INIT_recv_fragments(int rule_id, char *msg, int le
 uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int len)
 {
     SCHC_Message decoder;
-    decoder.decode_message(SCHC_FRAG_PROTOCOL_LORAWAN, rule_id, msg, len);
-    if(decoder.get_msg_type() == SCHC_REGULAR_FRAGMENT_MSG)
+    uint8_t msg_type;
+    uint8_t w;              // w recibido en el mensaje
+    uint8_t dtag;           // dtag recibido en el mensajes
+    uint8_t fcn;            // fcn recibido en el mensaje
+    char*   payload;
+    int     payload_len;    // in bits
+    char*   rcs;
+
+    msg_type = decoder.get_msg_type(SCHC_FRAG_PROTOCOL_LORAWAN, rule_id, msg, len);
+
+    if(msg_type == SCHC_REGULAR_FRAGMENT_MSG)
     {
         SPDLOG_INFO("Receiving a SCHC Regular fragment");
-        std::string schc_payload = decoder.get_schc_payload();
-        int tiles_in_payload = schc_payload.size()/_tileSize;
-        SPDLOG_WARN("|-----W={:<1}, FCN={:<2}----->| {:>2} tiles recv", decoder.get_w(), decoder.get_fcn(), tiles_in_payload);
+        decoder.decode_message(SCHC_FRAG_PROTOCOL_LORAWAN, rule_id, msg, len);
 
+        payload_len     = decoder.get_schc_payload_len();   // largo del payload SCHC. En bits
+        fcn             = decoder.get_fcn();
+        w               = decoder.get_w();
+        char*   payload = new char[payload_len/8];          // buffer para recibir el SCHC payload (no olvidar liberar)
+        decoder.get_schc_payload(payload);                  // obtiene el SCHC payload
+
+
+        //Obteniendo la cantidad de tiles en el mensaje
+        int tiles_in_payload = (payload_len/8)/_tileSize;
+
+        for(int i=0; i<tiles_in_payload; i++)
+        {
+            char* tile_store = _tiles_map[{w, fcn-i}];
+            memcpy(tile_store, payload + (i*_tileSize), _tileSize);
+            _bitmap_map[{w, fcn-i}] = 1;
+        }
+
+        /* almacena el numero del ultimo fcn recibido*/
+        _last_fcn_received  = _last_fcn_received - tiles_in_payload ;
+        _last_bitmap_ptr[w] = _last_fcn_received+1;   
+
+
+        //this->print_tiles_array();
+
+        spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+        SPDLOG_WARN("|--- W={:<1}, FCN={:<2} --->| {:>2} tiles", w, fcn, tiles_in_payload);
+        spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+
+        if(_last_fcn_received <= 0)
+        {
+            SPDLOG_INFO("Sending SCHC ACK");
+            uint8_t c = get_c(w);                               // obtiene el valor de c en base al _bitmap_array
+            std::vector bitmap_vector = get_compress_bitmap(w); // obtiene el bitmap expresado como un arreglo de char    
+            int len;
+            char* buffer = nullptr;
+            decoder.create_schc_ack(_ruleID, dtag, w, c, bitmap_vector, buffer, len);
+            _stack->send_downlink_frame(_dev_id, SCHC_FRAG_DOWNLINK_DIRECTION_RULE_ID, buffer, len);
+            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+            SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap: {}", w, c, get_bitmap_array_str(w));
+            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+        }
+        
     }
 
     return 0;
 }
 
-uint8_t SCHC_Ack_on_error::mtuUpgrade(int mtu)
+void SCHC_Ack_on_error::print_tiles_array()
+{ 
+    for(uint8_t w=0; w < _nMaxWindows; w++)
+    {
+        for(int fcn=(_windowSize-1); fcn>=0; fcn--)
+        {
+            if (_tiles_map.find({w,fcn}) != _tiles_map.end()) 
+            {
+                std::ostringstream oss;
+                char* buff = _tiles_map[{w,(uint8_t)fcn}];
+                for(int i=0; i<_tileSize;i++)
+                {
+                    oss << fmt::format("{:02x} ", static_cast<unsigned char>(buff[i]));
+                }
+                SPDLOG_INFO("w:{}, fcn:{}, {}", w, fcn, oss.str());
+            }
+        }
+    }
+}
+
+uint8_t SCHC_Ack_on_error::mtu_upgrade(int mtu)
 {
     SPDLOG_TRACE("Entering the function");
 
@@ -112,339 +191,75 @@ uint8_t SCHC_Ack_on_error::mtuUpgrade(int mtu)
     return 0;
 }
 
-uint8_t SCHC_Ack_on_error::divideInTiles(char *buffer, int len)
+std::string SCHC_Ack_on_error::get_bitmap_array_str(uint8_t window)
 {
-/* Creates an array of size _nFullTiles x _tileSize to store the message. 
-Each row of the array is a tile of tileSize bytes. It also determines 
-the number of SCHC windows.*/
-
-    SPDLOG_TRACE("Entering the function");
-
-
-/* RFC9011
- 5.6.2. Uplink Fragmentation: From Device to SCHC Gateway
-
-Last tile: It can be carried in a Regular SCHC Fragment, alone 
-in an All-1 SCHC Fragment, or with any of these two methods. 
-Implementations must ensure that:
-*/
-    if((len%_tileSize)==0)
+    std::string bitmap_str = "";
+    for(int fcn=(_windowSize-1); fcn>=0; fcn--)
     {
-        /* El ultimo tile es del tamaño de _TileSize */
-        _nFullTiles = (len/_tileSize)-1;
-        _lastTileSize = _tileSize;  
-    }
-    else
-    {
-        /* El ultimo tile es menor _TileSize */
-        _nFullTiles = (len/_tileSize);
-        _lastTileSize = len%_tileSize;
-    }
-
-
-    SPDLOG_INFO("Full Tiles number: {} tiles", _nFullTiles);
-    SPDLOG_INFO("Last Tile Size: {} bytes", _lastTileSize);
-
-    // memory allocated for elements of rows.
-    _tilesArray = new char*[_nFullTiles];
-
-    // memory allocated for  elements of each column.  
-    for(int i = 0 ; i < _nFullTiles ; i++ )
-    {
-        _tilesArray[i] = new char[_tileSize];
-    }
-
-    uint8_t k=0;
-    for(int i=0; i<_nFullTiles; i++)
-    {
-        for(int j=0; j<_tileSize;j++)
+        if(_bitmap_map[{window,fcn}]==-1)
         {
-            _tilesArray[i][j] = buffer[k];
-            k++;
-        }
-    }
-
-    _lastTile = new char[_lastTileSize];
-    for(int i=0; i<_lastTileSize; i++)
-    {
-        _lastTile[i] = buffer[k];
-        k++;
-    }
-
-    /* Numero de ventanas SCHC */
-    if(len>(_tileSize*_windowSize*3))
-    {
-        _nWindows = 4;
-    }
-    else if(len>(_tileSize*_windowSize*2))
-    {
-        _nWindows = 3;
-    }
-    else if (len>(_tileSize*_windowSize))
-    {
-        _nWindows = 2;
-    }
-    else
-    {
-        _nWindows = 1;
-    }
-
-    SPDLOG_INFO("SCHC Windows number: {}", _nWindows);
-
-
-    // // free the allocated memory 
-    // for( uint8_t i = 0 ; i < len ; i++ ) {
-    //     delete [] _tilesArray[i];
-    // }
-    // delete [] _tilesArray;
-
-    SPDLOG_TRACE("Leaving the function");
-
-    return 0;
-}
-
-uint8_t SCHC_Ack_on_error::extractTiles(uint8_t firstTileID, uint8_t nTiles, char *buff)
-{
-    SPDLOG_TRACE("Entering the function");
-
-
-    int k=0;
-    for(int i=firstTileID; i<(firstTileID+nTiles); i++)
-    {
-        for(int j=0;j<_tileSize;j++)
-        {
-            buff[k] = _tilesArray[i][j];
-            k++;
-        }
-    }
-
-    SPDLOG_TRACE("Leaving the function");
-
-    return 0;
-}
-
-uint8_t SCHC_Ack_on_error::getCurrentWindow(int tile_ptr)
-{
-    if(tile_ptr < _windowSize)
-    {
-        return 0;
-    }
-    else if(tile_ptr < 2 * _windowSize)
-    {
-        return 1;
-    }
-    else if(tile_ptr < 3 * _windowSize)
-    {
-        return 2;
-    }
-    else if(tile_ptr < 4 * _windowSize)
-    {
-        return 3;
-    }
-    else
-    {
-        SPDLOG_ERROR("In LoRaWAN, it is not possible that more than (4 * _windowSize)) tiles");
-    }
-    return 0;
-}
-
-uint8_t SCHC_Ack_on_error::getCurrentFCN(int tile_ptr)
-{
-    if(tile_ptr < _windowSize)
-    {
-        return (_windowSize - 1 - tile_ptr);
-    }
-    else if(tile_ptr < 2 * _windowSize)
-    {
-        return (2*_windowSize - 1 - tile_ptr);
-    }
-    else if(tile_ptr < 3 * _windowSize)
-    {
-        return (3*_windowSize - 1 - tile_ptr);
-    }
-    else if(tile_ptr < 4 * _windowSize)
-    {
-        return (4*_windowSize - 1 - tile_ptr);
-    }
-    else
-    {
-        SPDLOG_ERROR("In LoRaWAN, it is not possible that more than (4 * _windowSize)) tiles");
-    }
-    return 0;
-}
-
-uint8_t SCHC_Ack_on_error::setBitmapArray(int tile_ptr, int tile_sent)
-{
-    /* Se obtiene la posicion al Bitmap Array
-    a partir de la posicion del tile que se está enviando */
-    uint8_t bitmap_ptr = this->getCurrentBitmap_ptr(tile_ptr);
-
-    if((bitmap_ptr + tile_sent) <= _windowSize)
-    {
-        /* En este caso todos los tiles enviados
-        pertenecen a la misma ventana */
-        for(int i=bitmap_ptr; i<(bitmap_ptr + tile_sent); i++)
-        {
-            _currentBitmapArray[_currentWindow][i] = true;
-        }
-        return bitmap_ptr + tile_sent;
-    }
-    else
-    {
-        /* En este caso los tiles enviados
-        pertenecen a la misma ventana (i) y a la (i+1)*/
-        for(int i=bitmap_ptr; i<(_windowSize); i++)
-        {
-            SPDLOG_DEBUG("{}",i);
-            _currentBitmapArray[_currentWindow][i] = true;
-        }
-
-        for(int i=0; i<((bitmap_ptr+tile_sent)-(_windowSize)); i++)
-        {
-            SPDLOG_DEBUG("{}",i);
-            _currentBitmapArray[_currentWindow+1][i] = true;
-        }
-        return (bitmap_ptr+tile_sent)-(_windowSize);
-    }
-
-
-    return 0;
-}
-
-uint8_t SCHC_Ack_on_error::getCurrentBitmap_ptr(int tile_ptr)
-{
-    if(tile_ptr < _windowSize)
-    {
-        return (tile_ptr);
-    }
-    else if(tile_ptr < 2 * _windowSize)
-    {
-        return (tile_ptr - _windowSize);
-    }
-    else if(tile_ptr < 3 * _windowSize)
-    {
-        return (tile_ptr - 2*_windowSize);
-    }
-    else if(tile_ptr < 4 * _windowSize)
-    {
-        return (tile_ptr - 3*_windowSize);
-    }
-    else
-    {
-        SPDLOG_ERROR("In LoRaWAN, it is not possible that more than (4 * _windowSize)) tiles");
-    }
-    return 0;
-}
-
-uint8_t SCHC_Ack_on_error::createBitmapArray()
-{
-    // memory allocated for elements of rows.
-    _currentBitmapArray = new bool*[_nWindows];
-
-    // memory allocated for  elements of each column.  
-    for(int i = 0 ; i < _nWindows ; i++ )
-    {
-        _currentBitmapArray[i] = new bool[_windowSize];
-    }
-
-    int k=0;
-    for(int i=0; i<_nWindows; i++)
-    {
-        for(int j=0; j<_windowSize;j++)
-        {
-            _currentBitmapArray[i][j] = false;
-            k++;
-        }
-    }
-
-    return 0;
-}
-
-void SCHC_Ack_on_error::printCurrentBitmap(uint8_t nWindow)
-{
-    char* buff = new char[100];
-    sprintf(buff," - Bitmap: "); 
-    for(int i=0; i<_windowSize; i++)
-    {
-        if(_currentBitmapArray[nWindow][i])
-        {
-            sprintf(buff,"1");
+            bitmap_str += std::to_string(0);
         }
         else
         {
-            sprintf(buff,"0");
+            bitmap_str += std::to_string(_bitmap_map[{window,fcn}]);
         }
+        
     }
-    SPDLOG_INFO("{}",buff);
-    delete buff;
+    return bitmap_str;
 }
 
-void SCHC_Ack_on_error::printTileArray()
+std::vector<uint8_t> SCHC_Ack_on_error::get_compress_bitmap(uint8_t window)
 {
-    SPDLOG_DEBUG("***********************************************");
-    char* buff = new char[100];
-    for(int i=0; i<_nFullTiles; i++)
+    std::vector<uint8_t> compress_bitmap;
+
+    uint8_t c = get_c(window);
+    if(c == 0)
     {
-        if(i+1<10)
+        int n_bits_padding;
+        int bitmap_ptr = _last_bitmap_ptr[window];
+        std::vector<uint8_t> real_bitmap;
+
+        /* Traspasa a un vector todos los bitmap que son usados en la ventana (1s, 0s y -1s).
+        Los bitmaps traspasados son solo los usados. Definidos por el valor de bitmap_prt*/
+        for(int i = (_windowSize-1); i >= bitmap_ptr; i++)
         {
-            sprintf(buff,"Tile 0");
-            sprintf(buff,"%d",i+1);
-            sprintf(buff," --> ");
+            real_bitmap.push_back(_bitmap_map[{window,i}]);
         }
-        else
+
+        /* Transforma los bitmap con valor -1 a 0 */
+        for(uint8_t bit: real_bitmap)
         {
-            sprintf(buff,"Tile ");
-            sprintf(buff,"%d",i+1);
-            sprintf(buff," --> ");
+            if(bit == -1)
+                bit = 0;
         }
-        for(int j=0; j<_tileSize;j++)
-        {
-            sprintf(buff,"%d",_tilesArray[i][j]);
-            sprintf(buff," ");       
+
+        // Encontrar la posición del último 0
+        size_t last_zero_position = -1;
+        for (size_t i = 0; i < real_bitmap.size(); ++i) {
+            if (real_bitmap[i] == 0) {
+                last_zero_position = i;  // Actualizar la posición del último 0
+            }
         }
-        SPDLOG_DEBUG("{}",buff);
+
+        // Crear un nuevo vector con los valores hasta la posición del último 0
+        compress_bitmap.assign(real_bitmap.begin(), real_bitmap.begin() + last_zero_position + 1);
+
     }
 
-    if(_nFullTiles+1<10)
-    {
-        sprintf(buff,"Tile 0");
-        sprintf(buff,"%d",_nFullTiles+1);
-        sprintf(buff," --> ");
-    }
-    else
-    {
-        sprintf(buff,"Tile ");
-        sprintf(buff,"%d",_nFullTiles+1);
-        sprintf(buff," --> ");
-    }
-    for(int i=0; i<_lastTileSize; i++)
-    {
-        sprintf(buff,"%d",_lastTile[i]);
-        sprintf(buff," ");       
-    }
-    SPDLOG_DEBUG("{}",buff);
-    SPDLOG_DEBUG("***********************************************");
+    return compress_bitmap;
 }
 
-void SCHC_Ack_on_error::printBitmapArray()
+uint8_t SCHC_Ack_on_error::get_c(uint8_t window)
 {
-    char* buff = new char[100];
-
-    for(int i=0; i<_nWindows; i++)
+    for (const auto& [key, value] : _bitmap_map)
     {
-        for(int j=0; j<_windowSize; j++)
-        {
-            if(_currentBitmapArray[i][j])
-            {
-                sprintf(buff,"1");
-            }
-            else
-            {
-                sprintf(buff,"0");
-            }
+        if (key.first == window && value == 0) // Filtrar por la primera parte de la clave
+        {  
+            return 0;
         }
-        SPDLOG_INFO("{}",buff);
-        delete buff;      
     }
+
+    return 1;
 }
 

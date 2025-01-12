@@ -129,6 +129,7 @@ int main() {
     // Iniciar el bucle de la biblioteca para manejar mensajes
     mosquitto_loop_forever(mosq, 30000, 1);
 
+    SPDLOG_CRITICAL("Disconnection of the mqtt broker");
     mosquitto_loop_stop(mosq, true);
     mosquitto_destroy(mosq);
     mosquitto_lib_cleanup();

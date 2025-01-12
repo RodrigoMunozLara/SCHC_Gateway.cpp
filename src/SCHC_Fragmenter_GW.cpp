@@ -77,7 +77,7 @@ uint8_t SCHC_Fragmenter_GW::listen_messages(char *buffer)
         }
 
         SPDLOG_DEBUG("Queuing messages in the session with id: {}", id);
-        this->_uplinkSessionPool[id].queue_message(parser.get_rule_id(), parser.get_decoded_payload(), parser.get_payload_len());
+        this->_uplinkSessionPool[id].queue_message(device_id, parser.get_rule_id(), parser.get_decoded_payload(), parser.get_payload_len());
 
         SPDLOG_TRACE("Leaving the function");
         return 0;

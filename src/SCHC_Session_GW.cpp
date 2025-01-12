@@ -16,14 +16,14 @@ uint8_t SCHC_Session_GW::initialize(uint8_t protocol, uint8_t direction, uint8_t
         // SCHC session initialisation with LoRaWAN profile parameters (see RFC9011)
         _protocol = SCHC_FRAG_PROTOCOL_LORAWAN;
         _direction = SCHC_FRAG_DIRECTION_UPLINK;
-        _ruleID = 20;
+        _rule_id = 20;
         _tileSize = 10;                         // tile size in bytes
         _m = 2;                                 // bits of the W field
         _n = 6;                                 // bits of the FCN field
         _windowSize = 63;                       // tiles in a SCHC window
         _t = 0;                                 // bits of the DTag field
         _maxAckReq = 8;                         // max number of ACK Request msg
-        _retransTimer = 10;                     // Retransmission timer in seconds
+        _retransTimer = 12*60*60;               // Retransmission timer in seconds
         _inactivityTimer = 12*60*60;            // Inactivity timer in seconds
         _maxMsgSize = _tileSize*_windowSize*4;  // Maximum size of a SCHC packet in bytes
         _stack = stack_ptr;                     // Pointer to L2 stack
@@ -33,7 +33,7 @@ uint8_t SCHC_Session_GW::initialize(uint8_t protocol, uint8_t direction, uint8_t
     {
         _protocol = SCHC_FRAG_PROTOCOL_LORAWAN;
         _direction = SCHC_FRAG_DIRECTION_DOWNLINK;
-        _ruleID = 21;
+        _rule_id = 21;
         _tileSize = 0;                          // tile size in bytes
         _m = 1;                                 // bits of the W field
         _n = 1;                                 // bits of the FCN field
@@ -61,10 +61,10 @@ void SCHC_Session_GW::start()
 
 }
 
-uint8_t SCHC_Session_GW::queue_message(int rule_id, std::string msg, int len)
+uint8_t SCHC_Session_GW::queue_message(std::string dev_id, int rule_id, char* msg, int len)
 {
     SPDLOG_TRACE("Entering the function");
-    _queue.push(rule_id, msg, len);
+    _queue.push(dev_id, rule_id, msg, len);
     SPDLOG_TRACE("Leaving the function");
     return 0;
 }
@@ -81,10 +81,9 @@ void SCHC_Session_GW::process_message()
         {
             SPDLOG_INFO("\033[31mExtracting message from the queue.\033[0m");
             SPDLOG_DEBUG("Current queue size: {}", _queue.size());
-            std::string msg;
+            char* msg = nullptr;
             int len;
-            int rule_id;
-            _queue.pop(rule_id, msg, len);
+            _queue.pop(_dev_id, _rule_id, msg, len);
 
             if(_is_first_msg)
             {
@@ -97,12 +96,9 @@ void SCHC_Session_GW::process_message()
                 this->_is_first_msg = false;
             }
 
-
             /* Arrancando maquina de estado con el primer mensaje */
-            char* buff = new char[len];
-            strcpy(buff, msg.c_str());
-            this->_stateMachine->start(rule_id, buff, len);
-            delete[] buff;
+            this->_stateMachine->set_device_id(_dev_id);
+            this->_stateMachine->execute_machine(_rule_id, msg, len);
         }
         
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -130,7 +126,7 @@ uint8_t SCHC_Session_GW::createStateMachine()
         _stateMachine = new SCHC_Ack_on_error();
 
         /* Inicializando maquina de estado */
-        _stateMachine->init(_ruleID, -1, _windowSize, _tileSize, _n, ACK_MODE_ACK_END_WIN, _stack, _retransTimer, _maxAckReq);
+        _stateMachine->init(_rule_id, 0, _windowSize, _tileSize, _n, _m, ACK_MODE_ACK_END_WIN, _stack, _retransTimer, _maxAckReq);
 
         SPDLOG_INFO("State machine successfully created, initiated, and started");
 

@@ -18,19 +18,19 @@ class SCHC_Session_GW
     public:
         uint8_t initialize(uint8_t protocol, uint8_t direction, uint8_t session_id, SCHC_Stack_L2* stack_ptr);
         void    start();
-        uint8_t queue_message(int rule_id, std::string msg, int len);
+        uint8_t queue_message(std::string dev_id, int rule_id, char* msg, int len);
         void    process_message();
         bool    getIsUsed();
         void    setIsUsed(bool isUsed);
     private:
         uint8_t createStateMachine();
         uint8_t destroyStateMachine();
-        bool _isUsed;
+        bool                    _isUsed;
         uint8_t                 _session_id;
         uint8_t                 _protocol;
         uint8_t                 _direction;
-        uint8_t                 _ruleID;
         //uint8_t                 _dTag;
+        int                     _rule_id;
         uint8_t                 _tileSize;              // tile size in bytes
         uint8_t                 _m;                     // bits of the W field
         uint8_t                 _n;                     // bits of the FCN field
@@ -42,6 +42,7 @@ class SCHC_Session_GW
         uint8_t                 _txAttemptsCounter;     // transmission attempt counter
         uint8_t                 _rxAttemptsCounter;     // reception attempt counter
         int                     _maxMsgSize;            // Maximum size of a SCHC packet in bytes
+        std::string             _dev_id;                // Device identifier
         SCHC_State_Machine*     _stateMachine;
         SCHC_Stack_L2*          _stack;
         SCHC_ThreadSafeQueue    _queue;

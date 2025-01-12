@@ -10,24 +10,24 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <iostream>
+#include "SCHC_Message.hpp"
 
 using json = nlohmann::json;
 
 class SCHC_TTN_Parser
 {
     public:
-        int     initialize_parser(char *buffer);
-        std::string get_decoded_payload();
+        int         initialize_parser(char *buffer);
+        char*       get_decoded_payload();
         int         get_payload_len();
         std::string get_device_id();
         int         get_rule_id();  
     private:
-        std::string base64_decode(const std::string& encoded);
-        std::string _decoded_payload;   // frm_payload decoded
-        int         _len;               // frmPayload length
-        std::string _deviceId;          // LoRaWAN deviceID
+        uint8_t     base64_decode(std::string encoded, char*& decoded_buffer, int& len);
+        char*       _decoded_payload = NULL;    // frm_payload decoded
+        int         _len;                       // frmPayload length
+        std::string _deviceId;                  // LoRaWAN deviceID
         int         _rule_id;
 };
-
 
 #endif

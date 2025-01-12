@@ -11,6 +11,7 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
         if(parsed_json.contains("end_device_ids") && parsed_json["end_device_ids"].contains("device_id"))
         {
             _deviceId = parsed_json["end_device_ids"]["device_id"];
+
             SPDLOG_DEBUG("DeviceID: {}", _deviceId);
         }
         else
@@ -24,26 +25,12 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
         {
             // save and print encoded buffer
             std::string frm_payload = parsed_json["uplink_message"]["frm_payload"];
-            SPDLOG_DEBUG("Encoded Payload: {}", frm_payload);
 
             // save and print decoded buffer (text format)
-            _decoded_payload = base64_decode(frm_payload);
-            SPDLOG_DEBUG("Decoded Payload (string format): {}", _decoded_payload);
-
-            // save and print decoded buffer (hex format)
-            const char* decoded_char_payload = _decoded_payload.c_str();
-            int len = _decoded_payload.size();
-
-            char buff[4*len];
-            int posicion = 0;
-            for(int i=0; i<len; i++)
-            {
-                int bytes_escritos = sprintf(buff + posicion, "%x ", static_cast<unsigned char>(decoded_char_payload[i]));
-                posicion += bytes_escritos;
-            }
-            SPDLOG_DEBUG("Decoded Payload (hex format): {}", (char*)buff);
+            base64_decode(frm_payload, _decoded_payload, _len);
+            SPDLOG_DEBUG("Decoded Payload (hex format):");
+            SCHC_Message::print_buffer_in_hex(_decoded_payload, _len);
             
-            _len = _decoded_payload.length();
             SPDLOG_DEBUG("Length: {}", _len);
         }
         else
@@ -76,7 +63,7 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
     return 0;
 }
 
-std::string SCHC_TTN_Parser::get_decoded_payload()
+char* SCHC_TTN_Parser::get_decoded_payload()
 {
     return _decoded_payload;
 }
@@ -96,7 +83,7 @@ int SCHC_TTN_Parser::get_rule_id()
     return _rule_id;
 }
 
-std::string SCHC_TTN_Parser::base64_decode(const std::string& encoded)
+uint8_t SCHC_TTN_Parser::base64_decode(std::string encoded, char*& decoded_buffer, int& len)
 {
     static const std::string base64_chars = 
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -113,5 +100,10 @@ std::string SCHC_TTN_Parser::base64_decode(const std::string& encoded)
             valb -= 8;
         }
     }
-    return decoded;
+    len = decoded.size();
+    // Esta memoria debe liberarse cuando ya no se use mas el mensaje
+    char* buffer = new char[len]; 
+    std::strcpy(buffer, decoded.c_str());
+    decoded_buffer = buffer;   
+    return 0;
 }

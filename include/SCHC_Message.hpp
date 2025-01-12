@@ -5,40 +5,38 @@
 #include <cstdio>
 #include <cstddef>
 #include <cstdint>
+#include <sstream>
+
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <bitset>
-#include <thread>
-#include <sstream>
-#include <string>
+
 
 class SCHC_Message
 {
     public:
         SCHC_Message();
-        int     createRegularFragment(uint8_t ruleID, uint8_t dtag, uint8_t w, uint8_t fcn, char *payload, int payload_len, char *buffer);
-        int     createACKRequest(uint8_t ruleID, uint8_t dtag, uint8_t w, char *buffer);
-        int     createSenderAbort(uint8_t ruleID, uint8_t dtag, uint8_t w, char *buffer);
-        uint8_t decode_message(uint8_t protocol, int rule_id, char *msg, int len);
-        uint8_t decode_schc_fragment(char *msg, int len);
-        void    printMsg(uint8_t protocol, uint8_t msgType, char *msg, int len);
-        void    printBin(uint8_t val);
-        void    print_string_in_hex(std::string str, int len);
-        uint8_t get_w();
-        uint8_t get_fcn();
-        uint8_t get_msg_type();
-        uint8_t get_c();
-        std::string get_schc_payload();
-        std::string get_rcs();
+        uint8_t     create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, uint8_t c, std::vector<uint8_t> bitmap_vector, char*& buffer, int& len);
+        uint8_t     get_msg_type(uint8_t protocol, int rule_id, char *msg, int len);
+        uint8_t     decode_message(uint8_t protocol, int rule_id, char *msg, int len);
+        uint8_t     get_w();
+        uint8_t     get_fcn();
+        uint8_t     get_dtag();
+        int         get_schc_payload_len();
+        uint8_t     get_schc_payload(char* schc_payload);
+        uint8_t     get_rcs(char*& rcs);
+        uint8_t     get_bitmap(char*& bitmap);
+        void        printMsg(uint8_t protocol, uint8_t msgType, char *msg, int len);
+        static void print_buffer_in_hex(char* buffer, int len);
     private:
-        uint8_t     _w = -1;
-        uint8_t     _fcn = -1;
-        uint8_t     _msg_type = -1;
-        uint8_t     _c = -1;
-        std::string _schc_payload = "";
-        std::string _rcs = "";
-    
+        uint8_t     _msg_type;
+        uint8_t     _w;
+        uint8_t     _fcn;
+        uint8_t     _dtag;
+        int         _schc_payload_len;
+        char*       _schc_payload = nullptr;
+        char*       _rcs = nullptr;
+        char*       _bitmap = nullptr;          
 };
 
 #endif
