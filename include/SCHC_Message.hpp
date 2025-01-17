@@ -24,10 +24,11 @@ class SCHC_Message
         uint8_t     get_dtag();
         int         get_schc_payload_len();
         uint8_t     get_schc_payload(char* schc_payload);
-        uint8_t     get_rcs(char*& rcs);
+        uint32_t    get_rcs();
         uint8_t     get_bitmap(char*& bitmap);
         void        printMsg(uint8_t protocol, uint8_t msgType, char *msg, int len);
         static void print_buffer_in_hex(char* buffer, int len);
+        void        delete_schc_payload();
     private:
         uint8_t     _msg_type;
         uint8_t     _w;
@@ -35,8 +36,7 @@ class SCHC_Message
         uint8_t     _dtag;
         int         _schc_payload_len;
         char*       _schc_payload = nullptr;
-        char*       _rcs = nullptr;
-        char*       _bitmap = nullptr;          
+        uint32_t    _rcs;        
 };
 
 #endif

@@ -11,9 +11,9 @@ uint8_t SCHC_Fragmenter_GW::initialize(uint8_t protocol)
         SPDLOG_TRACE("Entering the function");
         _protocol = protocol;
 
-        if(protocol==SCHC_FRAG_PROTOCOL_LORAWAN)
+        if(protocol==SCHC_FRAG_LORAWAN)
         {
-                SPDLOG_INFO("Initializing mqtt stack to connect to ttn-mqtt broker");
+                SPDLOG_DEBUG("Initializing mqtt stack to connect to ttn-mqtt broker");
 
                 _stack = nullptr;
                 _stack = new SCHC_TTN_MQTT_Stack();
@@ -23,22 +23,23 @@ uint8_t SCHC_Fragmenter_GW::initialize(uint8_t protocol)
 
                 /* initializing the session pool */
 
-                SPDLOG_INFO("Initializing SCHC session pool with {} sessions",_SESSION_POOL_SIZE);
+                SPDLOG_DEBUG("Initializing SCHC session pool with {} sessions",_SESSION_POOL_SIZE);
 
                 for(uint8_t i=0; i<_SESSION_POOL_SIZE; i++)
                 {
-                _uplinkSessionPool[i].initialize(SCHC_FRAG_PROTOCOL_LORAWAN,
-                                                SCHC_FRAG_DIRECTION_UPLINK,
+                _uplinkSessionPool[i].initialize(this,
+                                                SCHC_FRAG_LORAWAN,
+                                                SCHC_FRAG_UP,
                                                 i,
                                                 stack_ttn_mqtt);
-                _downlinkSessionPool[i].initialize(SCHC_FRAG_PROTOCOL_LORAWAN,
-                                                SCHC_FRAG_DIRECTION_DOWNLINK,
+                _downlinkSessionPool[i].initialize(this,
+                                                SCHC_FRAG_LORAWAN,
+                                                SCHC_FRAG_DOWN,
                                                 i,
                                                 stack_ttn_mqtt);
                 
                 }
         }
-
 
         SPDLOG_TRACE("Leaving the function");
 
@@ -51,7 +52,7 @@ uint8_t SCHC_Fragmenter_GW::listen_messages(char *buffer)
 
         SCHC_TTN_Parser parser;
         parser.initialize_parser(buffer);
-        SPDLOG_INFO("\033[1mReceiving messages from: {}\033[0m", parser.get_device_id());
+        SPDLOG_DEBUG("\033[1mReceiving messages from: {}\033[0m", parser.get_device_id());
 
         // Valida si existe una sesión asociada al deviceId.
         // Si no existe, solicita una sesion nueva.
@@ -59,25 +60,30 @@ uint8_t SCHC_Fragmenter_GW::listen_messages(char *buffer)
         int id = this->get_session_id(device_id);
         if(id == -1)
         {
-                id = this->get_free_session_id(SCHC_FRAG_DIRECTION_UPLINK);
+                /* No existen sesiones asociadas al device_id */
+
+                /* Obteniendo una nueva sesion de uplink */
+                id = this->get_free_session_id(SCHC_FRAG_UP);
                 if(id == -1)
                 {
                         return -1;
                 }
                 else
                 {       
-                        SPDLOG_INFO("Associating deviceid: {} with session id: {}", device_id, id);
+                        SPDLOG_DEBUG("Associating deviceid: {} with session id: {}", device_id, id);
                         this->associate_session_id(device_id, id);
-                        this->_uplinkSessionPool[id].start(); 
                 }
+        }
+
+        if(_uplinkSessionPool[id].is_running())
+        {
+                SPDLOG_DEBUG("Sending messages from {} to the session with id: {}", device_id, id);
+                this->_uplinkSessionPool[id].process_message(device_id, parser.get_rule_id(), parser.get_decoded_payload(), parser.get_payload_len()); 
         }
         else
         {
-                SPDLOG_INFO("Obtaining session id: {} to deviceid: {}", id, device_id);
+                SPDLOG_ERROR("The session is not running. Discarting message");
         }
-
-        SPDLOG_DEBUG("Queuing messages in the session with id: {}", id);
-        this->_uplinkSessionPool[id].queue_message(device_id, parser.get_rule_id(), parser.get_decoded_payload(), parser.get_payload_len());
 
         SPDLOG_TRACE("Leaving the function");
         return 0;
@@ -87,12 +93,13 @@ int SCHC_Fragmenter_GW::get_free_session_id(uint8_t direction)
 {
         SPDLOG_TRACE("Entering the function");
 
-        if(_protocol==SCHC_FRAG_PROTOCOL_LORAWAN && direction==SCHC_FRAG_DIRECTION_UPLINK)
+        if(_protocol==SCHC_FRAG_LORAWAN && direction==SCHC_FRAG_UP)
         {
                 for(uint8_t i=0; i<_SESSION_POOL_SIZE;i++)
                 {
-                        if(!_uplinkSessionPool[i].getIsUsed())
+                        if(!_uplinkSessionPool[i].is_running())
                         {
+                                _uplinkSessionPool[i].set_running(true);
                                 SPDLOG_TRACE("Leaving the function");
                                 return i;
                         }
@@ -121,6 +128,7 @@ uint8_t SCHC_Fragmenter_GW::associate_session_id(std::string deviceId, int sessi
 
 uint8_t SCHC_Fragmenter_GW::disassociate_session_id(std::string deviceId)
 {
+        std::this_thread::sleep_for(std::chrono::seconds(10));
         size_t res = _associationMap.erase(deviceId);
         if(res == 0)
         {
@@ -140,12 +148,12 @@ int SCHC_Fragmenter_GW::get_session_id(std::string deviceId)
         auto it = _associationMap.find(deviceId);
         if (it != _associationMap.end())
         {
-                SPDLOG_INFO("Recovering the session id: {} with Key: {}", it->second, deviceId);
+                SPDLOG_DEBUG("Recovering the session id: {} with Key: {}", it->second, deviceId);
                 return it->second;
         }
         else
         {
-                SPDLOG_INFO("Session does not exist for the Key: {}", deviceId);
+                SPDLOG_DEBUG("Session does not exist for the Key: {}", deviceId);
                 return -1;
         }
 }

@@ -22,9 +22,10 @@ class SCHC_TTN_Parser
         int         get_payload_len();
         std::string get_device_id();
         int         get_rule_id();  
+        void        delete_decoded_payload();
     private:
         uint8_t     base64_decode(std::string encoded, char*& decoded_buffer, int& len);
-        char*       _decoded_payload = NULL;    // frm_payload decoded
+        char*       _decoded_payload = nullptr;    // frm_payload decoded
         int         _len;                       // frmPayload length
         std::string _deviceId;                  // LoRaWAN deviceID
         int         _rule_id;

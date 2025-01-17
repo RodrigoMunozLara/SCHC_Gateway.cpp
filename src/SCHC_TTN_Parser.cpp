@@ -83,6 +83,11 @@ int SCHC_TTN_Parser::get_rule_id()
     return _rule_id;
 }
 
+void SCHC_TTN_Parser::delete_decoded_payload()
+{
+    delete[] _decoded_payload;
+}
+
 uint8_t SCHC_TTN_Parser::base64_decode(std::string encoded, char*& decoded_buffer, int& len)
 {
     static const std::string base64_chars = 
@@ -102,7 +107,7 @@ uint8_t SCHC_TTN_Parser::base64_decode(std::string encoded, char*& decoded_buffe
     }
     len = decoded.size();
     // Esta memoria debe liberarse cuando ya no se use mas el mensaje
-    char* buffer = new char[len]; 
+    char* buffer = new char[len];       // * Liberada en SCHC_Message::decode_message(), linea 122
     std::strcpy(buffer, decoded.c_str());
     decoded_buffer = buffer;   
     return 0;

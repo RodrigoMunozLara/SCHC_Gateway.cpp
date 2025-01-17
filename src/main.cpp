@@ -87,11 +87,11 @@ int main() {
     std::string topic_1 = "v3/" + std::string(username) + "/devices/+/up";
     topic_1_char = topic_1.c_str(); // Conversión a char* (solo lectura)
 
-    SPDLOG_INFO("Using MQTT parameter - host: {}", host);
-    SPDLOG_INFO("Using MQTT parameter - port: {}", port);
-    SPDLOG_INFO("Using MQTT parameter - username: {}", username);
-    SPDLOG_INFO("Using MQTT parameter - device_id_1: {}", device_id_1);
-    SPDLOG_INFO("Using MQTT parameter - topic: {}", topic_1);
+    SPDLOG_DEBUG("Using MQTT parameter - host: {}", host);
+    SPDLOG_DEBUG("Using MQTT parameter - port: {}", port);
+    SPDLOG_DEBUG("Using MQTT parameter - username: {}", username);
+    SPDLOG_DEBUG("Using MQTT parameter - device_id_1: {}", device_id_1);
+    SPDLOG_DEBUG("Using MQTT parameter - topic: {}", topic_1);
 
     mosquitto_lib_init();
 
@@ -124,7 +124,7 @@ int main() {
 
     // Initialize a SCHC_Fragmenter_GW to process the uplink and downlink messages
     frag.set_mqtt_stack(mosq);
-    frag.initialize(SCHC_FRAG_PROTOCOL_LORAWAN);
+    frag.initialize(SCHC_FRAG_LORAWAN);
     
     // Iniciar el bucle de la biblioteca para manejar mensajes
     mosquitto_loop_forever(mosq, 30000, 1);
@@ -139,8 +139,8 @@ int main() {
 
 void on_connect(struct mosquitto *mosq, void *obj, int rc) {
     if (rc == 0) {
-        SPDLOG_INFO("Connected to the {} broker successfully!", host);
-        SPDLOG_INFO("Waiting MQTT messages................");
+        SPDLOG_DEBUG("Connected to the {} broker successfully!", host);
+        SPDLOG_DEBUG("Waiting MQTT messages................");
         mosquitto_subscribe(mosq, nullptr, topic_1_char, 0);
     } else {
         SPDLOG_ERROR("Failed to connect, return code: {}", rc);

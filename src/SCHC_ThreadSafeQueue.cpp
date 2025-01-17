@@ -1,11 +1,11 @@
 #include "SCHC_ThreadSafeQueue.hpp"
 
-void SCHC_ThreadSafeQueue::push(std::string dev_id, int rule_id, char* mesg, int len) {
+void SCHC_ThreadSafeQueue::push(uint8_t rule_id, char* mesg, int len) {
     std::lock_guard<std::mutex> lock(_mutex);
-    _queue.push({dev_id, rule_id, mesg, len});
+    _queue.push({rule_id, mesg, len});
 }
 
-bool SCHC_ThreadSafeQueue::pop(std::string& dev_id, int& rule_id, char*& mesg, int& len) {
+bool SCHC_ThreadSafeQueue::pop(uint8_t& rule_id, char*& mesg, int& len) {
     std::lock_guard<std::mutex> lock(_mutex);
     if(_queue.empty())
     {
@@ -14,10 +14,9 @@ bool SCHC_ThreadSafeQueue::pop(std::string& dev_id, int& rule_id, char*& mesg, i
     else
     {
         auto tuple = _queue.front();
-        dev_id = std::get<0>(tuple);
-        rule_id = std::get<1>(tuple);
-        mesg = std::get<2>(tuple);
-        len = std::get<3>(tuple);
+        rule_id = std::get<0>(tuple);
+        mesg = std::get<1>(tuple);
+        len = std::get<2>(tuple);
         _queue.pop();
         return true;
     }

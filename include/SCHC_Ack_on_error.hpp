@@ -4,6 +4,7 @@
 #include "SCHC_Macros.hpp"
 #include "SCHC_State_Machine.hpp"
 #include "SCHC_Message.hpp"
+#include "SCHC_ThreadSafeQueue.hpp"
 
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
@@ -13,24 +14,34 @@
 #include <cstdint>
 #include <vector>
 #include <map>
+#include <thread>
 
+class SCHC_Session_GW;
 
 class SCHC_Ack_on_error: public SCHC_State_Machine
 {
     public:
-        SCHC_Ack_on_error();
+        SCHC_Ack_on_error(SCHC_Session_GW* session);
         ~SCHC_Ack_on_error();
-        uint8_t init(uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t m, uint8_t ackMode, SCHC_Stack_L2* stack_ptr, int retTimer, uint8_t ackReqAttempts);
-        uint8_t execute_machine(int rule_id=0, char *msg=NULL, int len=0);
-        void                    set_device_id(std::string dev_id);
+        uint8_t                 init(std::string dev_id, uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t m, uint8_t ackMode, SCHC_Stack_L2* stack_ptr, int retTimer, uint8_t ackReqAttempts);
+        uint8_t                 execute_machine(int rule_id=0, char *msg=NULL, int len=0);
+        uint8_t                 queue_message(int rule_id, char* msg, int len);
+        void                    message_reception_loop();
+        bool                    is_running();
+        void                    destroy_machine();
     private: 
         uint8_t                 RX_INIT_recv_fragments(int rule_id, char *msg, int len);
         uint8_t                 RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int len);
-        void                    print_tiles_array();
-        uint8_t                 mtu_upgrade(int mtu);
+        uint8_t                 RX_END_end_session(int rule_id, char *msg, int len);
         std::string             get_bitmap_array_str(uint8_t window);
-        std::vector<uint8_t>    get_compress_bitmap(uint8_t window);
-        uint8_t                 get_c(uint8_t window);
+        std::vector<uint8_t>    get_bitmap_array_vec(uint8_t window);
+        uint8_t                 get_c_from_bitmap(uint8_t window);
+        bool                    check_rcs(uint32_t rcs);
+        uint32_t                calculate_crc32(const char *data, size_t length);
+        int                     get_tile_ptr(uint8_t window, uint8_t fcn);
+        int                     get_bitmap_ptr(uint8_t fcn);
+        void                    print_tail_array_str();
+        void                    print_tail_array_hex();
         
 
         /* Static SCHC parameters */
@@ -45,21 +56,29 @@ class SCHC_Ack_on_error: public SCHC_State_Machine
         uint32_t        _retransTimer;
         uint8_t         _maxAckReq;
         std::string     _dev_id;
+        char*           _last_tile;     // almacena el ultimo tile
+        char**          _tilesArray;
+        uint8_t**       _bitmapArray;
+        int             _last_window;   // almacena el numero de la ultima ventana
+
 
         /* Dynamic SCHC parameters */
         uint8_t         _currentState;
-        uint8_t         _last_window_received;
-        int             _last_fcn_received;
-        std::map<uint8_t, int>                          _last_bitmap_ptr;   // key: w, value: last fcn
-        std::map<std::pair<uint8_t, uint8_t>, char*>    _tiles_map;         // key.first: w, key.second: fcn
-        std::map<std::pair<uint8_t, uint8_t>, int8_t>   _bitmap_map;        // key.first: w, key.second: fcn
+        uint8_t         _currentWindow;
+        int             _currentTile_ptr;
 
         /* Static LoRaWAN parameters*/
-        int             _current_L2_MTU;
-        SCHC_Stack_L2*  _stack;
+        int                 _current_L2_MTU;
+        SCHC_Stack_L2*      _stack;
 
-        /* Control Flags*/
-        bool            _is_first_schc_fragment;
+        /* Thread and Queue Message*/
+        SCHC_ThreadSafeQueue    _queue;
+        std::atomic<bool>       _running;               // atomic flag for the thread
+        std::atomic<bool>       _is_first_msg;
+        std::string             _name;                  // thread name
+        std::thread             _process_thread;        // thread
+
+        SCHC_Session_GW*        _session;
 };
 
 #endif

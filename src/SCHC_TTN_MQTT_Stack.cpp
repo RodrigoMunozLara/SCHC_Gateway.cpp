@@ -24,7 +24,7 @@ uint8_t SCHC_TTN_MQTT_Stack::send_downlink_frame(std::string dev_id, uint8_t rul
     std::string topic = "v3/" + std::string(_mqqt_username) + "/devices/" + dev_id + "/down/push";
 
     // Variables con valores dinámicos
-    int         f_port_value        = 21;
+    int         f_port_value        = ruleID;
     std::string frm_payload_value   = this->base64_encode(msg, len);
     std::string priority_value      = "NORMAL";
 
@@ -44,7 +44,7 @@ uint8_t SCHC_TTN_MQTT_Stack::send_downlink_frame(std::string dev_id, uint8_t rul
     const char* json_c_str = json_string.c_str();
 
     SPDLOG_DEBUG("Downlink topic: {}", topic);
-    SPDLOG_INFO("Downlink JSON: {}", json_string);
+    SPDLOG_DEBUG("Downlink JSON: {}", json_string);
 
     int result = mosquitto_loop(_mosq, -1, 1);
     if (result != MOSQ_ERR_SUCCESS) {
@@ -55,7 +55,7 @@ uint8_t SCHC_TTN_MQTT_Stack::send_downlink_frame(std::string dev_id, uint8_t rul
     }
     else
     {
-        SPDLOG_INFO("Connection with mqtt broker.... OK");
+        SPDLOG_DEBUG("Connection with mqtt broker.... OK");
     }
 
 
@@ -66,15 +66,15 @@ uint8_t SCHC_TTN_MQTT_Stack::send_downlink_frame(std::string dev_id, uint8_t rul
     }
     else
     {
-        SPDLOG_INFO("Message sent successfully");
+        SPDLOG_DEBUG("Message sent successfully");
     }
     return 0;
 }
 
 int SCHC_TTN_MQTT_Stack::getMtu(bool consider_Fopt)
 {
-    //TBD: obtener el MTU para enviar mensajes a TTN por MQTT. 
-    //TBD: ¿Que pasa cuando el mensaje es mas grande que el MTU soportado por el DR en el downlink?
+    // TODO: obtener el MTU para enviar mensajes a TTN por MQTT. 
+    // ? ¿Que pasa cuando el mensaje es mas grande que el MTU soportado por el DR en el downlink?
     return 0;
 }
 
