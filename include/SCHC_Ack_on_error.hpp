@@ -15,20 +15,22 @@
 #include <vector>
 #include <map>
 #include <thread>
+#include <functional>
 
 class SCHC_Session_GW;
 
-class SCHC_Ack_on_error: public SCHC_State_Machine
+class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_from_this<SCHC_Ack_on_error>
 {
     public:
-        SCHC_Ack_on_error(SCHC_Session_GW* session);
+        SCHC_Ack_on_error();
         ~SCHC_Ack_on_error();
         uint8_t                 init(std::string dev_id, uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t m, uint8_t ackMode, SCHC_Stack_L2* stack_ptr, int retTimer, uint8_t ackReqAttempts);
         uint8_t                 execute_machine(int rule_id=0, char *msg=NULL, int len=0);
         uint8_t                 queue_message(int rule_id, char* msg, int len);
         void                    message_reception_loop();
-        bool                    is_running();
-        void                    destroy_machine();
+        bool                    is_processing();
+        void                    set_end_callback(std::function<void()> callback);
+        static void             thread_entry_point(std::shared_ptr<SCHC_Ack_on_error> instance);
     private: 
         uint8_t                 RX_INIT_recv_fragments(int rule_id, char *msg, int len);
         uint8_t                 RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int len);
@@ -73,12 +75,10 @@ class SCHC_Ack_on_error: public SCHC_State_Machine
 
         /* Thread and Queue Message*/
         SCHC_ThreadSafeQueue    _queue;
-        std::atomic<bool>       _running;               // atomic flag for the thread
-        std::atomic<bool>       _is_first_msg;
+        std::atomic<bool>       _processing;               // atomic flag for the thread
         std::string             _name;                  // thread name
         std::thread             _process_thread;        // thread
-
-        SCHC_Session_GW*        _session;
+        std::function<void()>   _end_callback;
 };
 
 #endif

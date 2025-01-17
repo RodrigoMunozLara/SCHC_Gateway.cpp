@@ -3,6 +3,7 @@
 
 #include "SCHC_Stack_L2.hpp"
 #include <cstddef>
+#include <functional>
 
 class SCHC_State_Machine
 {
@@ -12,7 +13,8 @@ class SCHC_State_Machine
         virtual uint8_t execute_machine(int rule_id=0, char *msg=NULL, int len=0) = 0;
         virtual uint8_t queue_message(int rule_id, char* msg, int len) = 0;
         virtual void    message_reception_loop() = 0;
-        virtual bool    is_running() = 0;
+        virtual bool    is_processing() = 0;
+        virtual void    set_end_callback(std::function<void()> callback) = 0;
 };
 
 #endif

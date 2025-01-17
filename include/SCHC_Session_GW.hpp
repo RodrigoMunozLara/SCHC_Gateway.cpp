@@ -11,6 +11,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <mosquitto.h>
 #include <sstream>
+#include <functional>
 
 class SCHC_Fragmenter_GW;
 
@@ -21,6 +22,8 @@ class SCHC_Session_GW
         void    process_message(std::string dev_id, int rule_id, char* msg, int len);
         bool    is_running();
         void    set_running(bool status);
+        bool    is_first_msg();
+        void    set_is_first_msg(bool status);
         void    destroyStateMachine();
     private:
         uint8_t                 _session_id;
@@ -38,12 +41,12 @@ class SCHC_Session_GW
         uint8_t                 _rxAttemptsCounter;     // reception attempt counter
         int                     _maxMsgSize;            // Maximum size of a SCHC packet in bytes
         //SCHC_State_Machine*     _stateMachine;
-        std::unique_ptr<SCHC_State_Machine> _stateMachine;
+        std::shared_ptr<SCHC_State_Machine> _stateMachine;
         SCHC_Stack_L2*          _stack;
         SCHC_Fragmenter_GW*     _frag;
         std::string             _dev_id; 
 
-        std::atomic<bool>       _is_running;                // controla si la sesion está siendo usada o puede ser destruida
+        std::atomic<bool>       _is_running;            // controla si la sesion está siendo usada o puede ser destruida
         std::atomic<bool>       _is_first_msg;          // controla si la sesion ha recibido antes algun mensaje
 };
 

@@ -72,6 +72,7 @@ uint8_t SCHC_Fragmenter_GW::listen_messages(char *buffer)
                 {       
                         SPDLOG_DEBUG("Associating deviceid: {} with session id: {}", device_id, id);
                         this->associate_session_id(device_id, id);
+                        this->_uplinkSessionPool[id].set_running(true);
                 }
         }
 
@@ -121,7 +122,7 @@ uint8_t SCHC_Fragmenter_GW::associate_session_id(std::string deviceId, int sessi
                 return 0;
         } else
         {
-                SPDLOG_ERROR("The key already existsin the map. Key: {}", deviceId);
+                SPDLOG_ERROR("The key already exists in the map. Key: {}", deviceId);
                 return -1;
         }
 }

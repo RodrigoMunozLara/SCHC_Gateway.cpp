@@ -1,13 +1,14 @@
 #include "SCHC_Ack_on_error.hpp"
 #include "SCHC_Fragmenter_GW.hpp"
 
-SCHC_Ack_on_error::SCHC_Ack_on_error(SCHC_Session_GW* session)
+SCHC_Ack_on_error::SCHC_Ack_on_error()
 {
-    _session = session;
+    SPDLOG_DEBUG("Calling SCHC_Ack_on_error constructor");
 }
 
 SCHC_Ack_on_error::~SCHC_Ack_on_error()
 {
+    SPDLOG_DEBUG("Calling SCHC_Ack_on_error destructor");
 }
 
 uint8_t SCHC_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t m, uint8_t ackMode, SCHC_Stack_L2 *stack_ptr, int retTimer, uint8_t ackReqAttempts)
@@ -29,7 +30,7 @@ uint8_t SCHC_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag
     _currentWindow      = 0;
     _currentTile_ptr    = 0;
     _dev_id             = dev_id;
-    _running            = false;
+    _processing.store(false);
 
     /* Static LoRaWAN parameters*/
     _current_L2_MTU = stack_ptr->getMtu(true);
@@ -38,9 +39,12 @@ uint8_t SCHC_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag
    _currentState = STATE_RX_INIT;
 
 
-    this->_running = true;
-    _process_thread = std::thread(&SCHC_Ack_on_error::message_reception_loop, this);
-    _process_thread.detach(); // Desatachar el hilo para que sea independiente
+    /* Se arranca el thread */
+    _processing.store(true);
+    auto self = shared_from_this();     // Crear un shared_ptr que apunta a este objeto
+
+    _process_thread = std::thread(&SCHC_Ack_on_error::thread_entry_point, self);
+    _process_thread.detach();           // Desatachar el hilo para que sea independiente
 
 
     SPDLOG_TRACE("Leaving the function");
@@ -91,9 +95,18 @@ uint8_t SCHC_Ack_on_error::queue_message(int rule_id, char *msg, int len)
     return 0;
 }
 
+void SCHC_Ack_on_error::thread_entry_point(std::shared_ptr<SCHC_Ack_on_error> instance)
+{
+    if (instance)
+    {
+        instance->message_reception_loop();
+    }
+}
+
 void SCHC_Ack_on_error::message_reception_loop()
 {
-    while(this->_running)
+    SPDLOG_INFO("Entering message_reception_loop()");
+    while(_processing.load())
     {
         if(_queue.size() != 0)
         {
@@ -107,36 +120,40 @@ void SCHC_Ack_on_error::message_reception_loop()
         
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    this->destroy_machine();
-    // TODO: Comprobar que aun existe la instancia a SCHC_Ack_on_error, para ver si funcionó el puntero inteligente
-    SPDLOG_DEBUG("Ending Thread...");
+
+    // Llamar al callback al finalizar
+    if (_end_callback)
+    {
+        SPDLOG_WARN("Releasing memory resources in the state machine");
+        /* Liberando memoria de _tailArray*/
+        for(int i = 0 ; i < _nTotalTiles ; i++ )
+        {
+            delete[] _tilesArray[i];
+        }
+        delete[] _tilesArray;
+
+        /* Liberando memoria de _bitmapArray*/
+        for(int i = 0 ; i < _nMaxWindows ; i++)
+        {
+            delete[] _bitmapArray[i];
+        }
+        delete[] _bitmapArray;
+
+        _end_callback();
+    }
+
+    SPDLOG_WARN("Thread finished");
     return;
 }
 
-bool SCHC_Ack_on_error::is_running()
+bool SCHC_Ack_on_error::is_processing()
 {
-    return this->_running;
+    return _processing.load();
 }
 
-void SCHC_Ack_on_error::destroy_machine()
+void SCHC_Ack_on_error::set_end_callback(std::function<void()> callback)
 {
-    
-    /* Liberando memoria de _tailArray*/
-    for(int i = 0 ; i < _nTotalTiles ; i++ )
-    {
-        delete[] _tilesArray[i];
-    }
-    delete[] _tilesArray;
-
-    /* Liberando memoria de _bitmapArray*/
-    for(int i = 0 ; i < _nMaxWindows ; i++)
-    {
-        delete[] _bitmapArray[i];
-    }
-    delete[] _bitmapArray;
-
-    _session->destroyStateMachine();
-
+    _end_callback = callback;
 }
 
 uint8_t SCHC_Ack_on_error::RX_INIT_recv_fragments(int rule_id, char *msg, int len)
@@ -303,7 +320,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
     }
     else
     {
-        SPDLOG_WARN("Receiving an unexpected type of message. Discarding message");
+        SPDLOG_ERROR("Receiving an unexpected type of message. Discarding message");
     }
 
     return 0;
@@ -328,7 +345,14 @@ uint8_t SCHC_Ack_on_error::RX_END_end_session(int rule_id, char *msg, int len)
 
         SPDLOG_INFO("Ending Session...");
 
-        this->_running = false;
+        _processing.store(false);
+
+        // Asegurar que el hilo finalice
+        if (_process_thread.joinable())
+        {
+            _process_thread.join();
+        }
+
     }
 
     return 0;

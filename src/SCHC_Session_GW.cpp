@@ -8,8 +8,9 @@ uint8_t SCHC_Session_GW::initialize(SCHC_Fragmenter_GW* frag, uint8_t protocol, 
     _session_id = session_id;
     _frag       = frag;
 
-    _is_running = false;        // at the beginning, the sessions are not being used
-    _is_first_msg = true;   // the flag allows to create the state machine only with the first message
+    set_running(false);         // at the beginning, the sessions are not being used
+    set_is_first_msg(true);     // the flag allows to create the state machine only with the first message
+
 
     if(direction==SCHC_FRAG_UP && protocol==SCHC_FRAG_LORAWAN)
     {
@@ -50,25 +51,28 @@ uint8_t SCHC_Session_GW::initialize(SCHC_Fragmenter_GW* frag, uint8_t protocol, 
 
 void SCHC_Session_GW::process_message(std::string dev_id, int rule_id, char* msg, int len)
 {
-    SPDLOG_TRACE("Entering the function");
+
+    SPDLOG_TRACE("Entering the function.");
 
     if(_protocol==SCHC_FRAG_LORAWAN && _direction==SCHC_FRAG_UP)
     {
-        if(_is_first_msg)
+        if(is_first_msg())
         {
             SPDLOG_WARN("\033[1mReceiving first message from: {}\033[0m", dev_id);
-            _is_running = true;
             _dev_id     = dev_id;
 
             /* Creando e inicializando maquina de estado*/
-            _stateMachine = std::make_unique<SCHC_Ack_on_error>(this);
+            _stateMachine = std::make_shared<SCHC_Ack_on_error>();
+
+            _stateMachine->set_end_callback(std::bind(&SCHC_Session_GW::destroyStateMachine, this));
+
             SPDLOG_DEBUG("State machine successfully created.");
 
             /* Inicializando maquina de estado */
             _stateMachine->init(dev_id, rule_id, 0, _windowSize, _tileSize, _n, _m, ACK_MODE_ACK_END_WIN, _stack, _retransTimer, _maxAckReq);
             SPDLOG_DEBUG("State machine successfully initiated.");
 
-            this->_is_first_msg = false;
+            set_is_first_msg(false);
         }
 
         _stateMachine->queue_message(rule_id, msg, len);
@@ -76,7 +80,7 @@ void SCHC_Session_GW::process_message(std::string dev_id, int rule_id, char* msg
     }
     else if (_protocol==SCHC_FRAG_LORAWAN && _direction==SCHC_FRAG_DOWN)
     {
-        if(_is_first_msg)
+        if(is_first_msg())
         {
             /* Creando e inicializando maquina de estado*/
             // TODO: Instanciar un SCHC_ACK_Always()  
@@ -86,7 +90,7 @@ void SCHC_Session_GW::process_message(std::string dev_id, int rule_id, char* msg
 
             SPDLOG_DEBUG("State machine successfully created, initiated, and started");
 
-            this->_is_first_msg = false;
+            set_is_first_msg(false);
         }    
 
         _stateMachine->queue_message(rule_id, msg, len);    
@@ -97,19 +101,32 @@ void SCHC_Session_GW::process_message(std::string dev_id, int rule_id, char* msg
 
 bool SCHC_Session_GW::is_running()
 {
-    return this->_is_running;
+    return _is_running.load();
 }
 
 void SCHC_Session_GW::set_running(bool status)
 {
-    this->_is_running = status;
+    _is_running.store(status);
+}
+
+bool SCHC_Session_GW::is_first_msg()
+{
+    return _is_first_msg.load();
+}
+
+void SCHC_Session_GW::set_is_first_msg(bool status)
+{
+    _is_first_msg.store(status);
 }
 
 void SCHC_Session_GW::destroyStateMachine()
 {
-    this->_is_running = false;
+    set_running(false);
+    set_is_first_msg(true);
+    SPDLOG_WARN("Blocking new message reception (is_running = false).");
     _stateMachine.reset();
+    SPDLOG_WARN("State machine successfully destroyed");
     _frag->disassociate_session_id(_dev_id);
-    SPDLOG_DEBUG("State machine successfully destroyed");
+    SPDLOG_WARN("Session successfully disassociate");
     return;
 }
