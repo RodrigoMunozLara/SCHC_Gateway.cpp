@@ -87,11 +87,19 @@ int main() {
     std::string topic_1 = "v3/" + std::string(username) + "/devices/+/up";
     topic_1_char = topic_1.c_str(); // Conversión a char* (solo lectura)
 
-    SPDLOG_DEBUG("Using MQTT parameter - host: {}", host);
-    SPDLOG_DEBUG("Using MQTT parameter - port: {}", port);
-    SPDLOG_DEBUG("Using MQTT parameter - username: {}", username);
-    SPDLOG_DEBUG("Using MQTT parameter - device_id_1: {}", device_id_1);
-    SPDLOG_DEBUG("Using MQTT parameter - topic: {}", topic_1);
+    SPDLOG_CRITICAL("Using MQTT parameter - host: {}", host);
+    SPDLOG_CRITICAL("Using MQTT parameter - port: {}", port);
+    SPDLOG_CRITICAL("Using MQTT parameter - username: {}", username);
+    SPDLOG_CRITICAL("Using MQTT parameter - device_id_1: {}", device_id_1);
+    SPDLOG_CRITICAL("Using MQTT parameter - topic: {}", topic_1);
+
+    // SCHC parameter
+    const char* ack_mode_char   = ini.GetValue("schc", "schc_ack_mode", "Desconocido");
+    const uint8_t ack_mode      = std::stoi(ack_mode_char);
+    const char* error_prob_char = ini.GetValue("schc", "error_prob", "Desconocido");
+    const uint8_t error_prob    = std::stoi(error_prob_char);
+    SPDLOG_CRITICAL("Using SCHC parameter - ack_mode: {}", ack_mode);
+    SPDLOG_CRITICAL("Using SCHC parameter - error_prob: {}", error_prob);
 
     mosquitto_lib_init();
 
@@ -124,7 +132,7 @@ int main() {
 
     // Initialize a SCHC_Fragmenter_GW to process the uplink and downlink messages
     frag.set_mqtt_stack(mosq);
-    frag.initialize(SCHC_FRAG_LORAWAN);
+    frag.initialize(SCHC_FRAG_LORAWAN, ack_mode, error_prob);
     
     // Iniciar el bucle de la biblioteca para manejar mensajes
     mosquitto_loop_forever(mosq, 30000, 1);
@@ -139,8 +147,8 @@ int main() {
 
 void on_connect(struct mosquitto *mosq, void *obj, int rc) {
     if (rc == 0) {
-        SPDLOG_DEBUG("Connected to the {} broker successfully!", host);
-        SPDLOG_DEBUG("Waiting MQTT messages................");
+        SPDLOG_CRITICAL("Connected to the {} broker successfully!", host);
+        SPDLOG_CRITICAL("Waiting MQTT messages................");
         mosquitto_subscribe(mosq, nullptr, topic_1_char, 0);
     } else {
         SPDLOG_ERROR("Failed to connect, return code: {}", rc);
@@ -149,7 +157,7 @@ void on_connect(struct mosquitto *mosq, void *obj, int rc) {
 
 
 void on_message(struct mosquitto *mosq, void *obj, const struct mosquitto_message *msg) {
-    SPDLOG_DEBUG("Received message on topic: {} --> {}", msg->topic, static_cast<char*>(msg->payload));
+    //SPDLOG_TRACE("Received message on topic: {} --> {}", msg->topic, static_cast<char*>(msg->payload));
 
     if (msg->payloadlen > 0)
     {

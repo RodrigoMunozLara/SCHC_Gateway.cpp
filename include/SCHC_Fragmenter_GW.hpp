@@ -12,12 +12,13 @@
 #include <mosquitto.h>
 #include "SCHC_ThreadSafeQueue.hpp"
 #include "SCHC_TTN_Parser.hpp"
+#include <random>
 
 class SCHC_Fragmenter_GW
 {
     public:
         uint8_t     set_mqtt_stack(mosquitto* mosqStack);
-        uint8_t     initialize(uint8_t protocol);
+        uint8_t     initialize(uint8_t protocol, uint8_t ack_mode, uint8_t error_prob = 0);
         uint8_t     listen_messages(char *buffer);
         uint8_t     disassociate_session_id(std::string deviceId);      
     private:
@@ -30,5 +31,6 @@ class SCHC_Fragmenter_GW
         SCHC_Stack_L2*                          _stack;
         std::unordered_map<std::string, int>    _associationMap;
         struct mosquitto*                       _mosq;
+        uint8_t                                 _error_prob;
 };
 #endif  // SCHC_Fragmenter_GW_hpp

@@ -15,6 +15,7 @@ class SCHC_State_Machine
         virtual void    message_reception_loop() = 0;
         virtual bool    is_processing() = 0;
         virtual void    set_end_callback(std::function<void()> callback) = 0;
+        virtual void    set_error_prob(uint8_t error_prob) = 0;
 };
 
 #endif

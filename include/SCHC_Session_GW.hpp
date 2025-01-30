@@ -18,7 +18,7 @@ class SCHC_Fragmenter_GW;
 class SCHC_Session_GW
 {
     public:
-        uint8_t initialize(SCHC_Fragmenter_GW* frag, uint8_t protocol, uint8_t direction, uint8_t session_id, SCHC_Stack_L2* stack_ptr);
+        uint8_t initialize(SCHC_Fragmenter_GW* frag, uint8_t protocol, uint8_t direction, uint8_t session_id, SCHC_Stack_L2* stack_ptr, uint8_t ack_mode, uint8_t error_prob);
         void    process_message(std::string dev_id, int rule_id, char* msg, int len);
         bool    is_running();
         void    set_running(bool status);
@@ -44,7 +44,9 @@ class SCHC_Session_GW
         std::shared_ptr<SCHC_State_Machine> _stateMachine;
         SCHC_Stack_L2*          _stack;
         SCHC_Fragmenter_GW*     _frag;
-        std::string             _dev_id; 
+        std::string             _dev_id;
+        uint8_t                 _ack_mode;
+        uint8_t                 _error_prob;
 
         std::atomic<bool>       _is_running;            // controla si la sesion está siendo usada o puede ser destruida
         std::atomic<bool>       _is_first_msg;          // controla si la sesion ha recibido antes algun mensaje

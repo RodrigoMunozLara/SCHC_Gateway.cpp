@@ -4,7 +4,7 @@ SCHC_Message::SCHC_Message()
 {
 }
 
-uint8_t SCHC_Message::create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, uint8_t c, std::vector<uint8_t> bitmap_vector, char*& buffer, int& len)
+uint8_t SCHC_Message::create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, uint8_t c, std::vector<uint8_t> bitmap_vector, char*& buffer, int& len, bool must_compress)
 {
     uint8_t w_mask      = 0xC0;
     uint8_t c_mask      = 0x20;
@@ -22,23 +22,118 @@ uint8_t SCHC_Message::create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, 
         // hay errores, se deben calcular los bits de padding según:
         // https://www.rfc-editor.org/rfc/rfc8724.html#name-schc-ack-format
 
-        int n_padding = 8 - ((bitmap_vector.size()+3)%8);
-
-        for(int i=0; i<n_padding; i++)
+        if(must_compress)
         {
-            bitmap_vector.push_back(0);
-        } 
+            int last_zero = 0;
+            //std::reverse(bitmap_vector.begin(), bitmap_vector.end());
+            std::vector<uint8_t> compress_bitmap_vector;
 
-        // consturye los bits del SCHC packet (header + bitmap) como un vector
-        std::vector<uint8_t> bits;
+            /* Se obtiene la ubicación del ultimo cero revisando de izquierda a derecha en el bitmap*/
+            for(size_t i=0; i<bitmap_vector.size(); i++)
+            {
+                if(bitmap_vector[i] == 0)
+                    last_zero = i;
+            }
 
+            for(size_t i=0; i<=last_zero; i++)
+            {
+                compress_bitmap_vector.push_back(bitmap_vector[i]);
+            }
 
+            int n_paddin_bits = 8 - ((compress_bitmap_vector.size() + 3) % 8);
+            for(int i=0; i< n_paddin_bits; i++)
+            {
+                compress_bitmap_vector.push_back(1);
+            }
 
-        // w está compuesto por 2 bits. Cada bit lo almacena en un uint8_t
-        bits.insert(bits.begin(), w & 0b00000001); // 0b00000010
-        bits.insert(bits.begin(), ((w & 0b00000010) >> 1));
+            // construye los bits del SCHC packet (header + bitmap) como un vector
+            std::vector<uint8_t> bits;
 
-        SPDLOG_DEBUG("Compress Bitmap size: {}", bits.size());
+            // bits para w y c. Está compuesto por 2 bits. Cada bit lo almacena en un uint8_t
+            bits.push_back((w >> 1) & 0b00000001);
+            bits.push_back(w & 0b00000001);
+            bits.push_back(c & 0b00000001);
+
+            for(int i=0; i<compress_bitmap_vector.size(); i++)
+            {
+                bits.push_back(compress_bitmap_vector[i]);
+            }
+
+            /* Convirte el mensaje SCHC desde un vector a un array de char*/
+            if(bits.size()%8 == 0)
+            {
+                
+                len = bits.size()/8;
+                char* schc_header   = new char[len];
+                int k=0;
+                for(int i=0; i < len; i++)
+                {
+                    schc_header[i] = ((bits[k] << 7) & 0b10000000) |
+                                ((bits[k+1] << 6) & 0b01000000) |
+                                ((bits[k+2] << 5) & 0b00100000) |
+                                ((bits[k+3] << 4) & 0b00010000) |
+                                ((bits[k+4] << 3) & 0b00001000) |
+                                ((bits[k+5] << 2) & 0b00000100) |
+                                ((bits[k+6] << 1) & 0b00000010) |
+                                (bits[k+7] & 0b00000001);
+                    k = k + 8;
+                }
+                buffer = schc_header;
+            }
+            else
+            {
+                SPDLOG_ERROR("The compressed bitmap is not a multiple of an L2 word");
+                return 1;
+            }
+        }
+        else
+        {
+            int n_paddin_bits = 8 - ((bitmap_vector.size() + 3) % 8);
+            for(int i=0; i< n_paddin_bits; i++)
+            {
+                bitmap_vector.push_back(0);
+            }
+
+            // construye los bits del SCHC packet (header + bitmap) como un vector
+            std::vector<uint8_t> bits;
+
+            // bits para w y c. Está compuesto por 2 bits. Cada bit lo almacena en un uint8_t
+            bits.push_back((w >> 1) & 0b00000001);
+            bits.push_back(w & 0b00000001);
+            bits.push_back(c & 0b00000001);
+
+            for(int i=0; i<bitmap_vector.size(); i++)
+            {
+                bits.push_back(bitmap_vector[i]);
+            }
+
+            /* Convirte el mensaje SCHC desde un vector a un array de char*/
+            if(bits.size()%8 == 0)
+            {
+                
+                len = bits.size()/8;
+                char* schc_header   = new char[len];
+                int k=0;
+                for(int i=0; i < len; i++)
+                {
+                    schc_header[i] = ((bits[k] << 7) & 0b10000000) |
+                                ((bits[k+1] << 6) & 0b01000000) |
+                                ((bits[k+2] << 5) & 0b00100000) |
+                                ((bits[k+3] << 4) & 0b00010000) |
+                                ((bits[k+4] << 3) & 0b00001000) |
+                                ((bits[k+5] << 2) & 0b00000100) |
+                                ((bits[k+6] << 1) & 0b00000010) |
+                                (bits[k+7] & 0b00000001);
+                    k = k + 8;
+                }
+                buffer = schc_header;
+            }
+            else
+            {
+                SPDLOG_ERROR("The compressed bitmap is not a multiple of an L2 word");
+                return 1;
+            }
+        }
     }
     return 0;
 }
@@ -161,7 +256,7 @@ void SCHC_Message::print_buffer_in_hex(char* buffer, int len)
     {
         oss << fmt::format("{:02x} ", static_cast<unsigned char>(buffer[i]));
     }
-    SPDLOG_DEBUG("{}", oss.str());
+    SPDLOG_TRACE("{}", oss.str());
 }
 
 void SCHC_Message::delete_schc_payload()

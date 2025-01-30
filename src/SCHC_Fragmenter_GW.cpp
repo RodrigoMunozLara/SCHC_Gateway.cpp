@@ -6,10 +6,11 @@ uint8_t SCHC_Fragmenter_GW::set_mqtt_stack(mosquitto *mosqStack)
         return 0;
 }
 
-uint8_t SCHC_Fragmenter_GW::initialize(uint8_t protocol)
+uint8_t SCHC_Fragmenter_GW::initialize(uint8_t protocol, uint8_t ack_mode, uint8_t error_prob)
 {
         SPDLOG_TRACE("Entering the function");
         _protocol = protocol;
+        _error_prob = error_prob;
 
         if(protocol==SCHC_FRAG_LORAWAN)
         {
@@ -31,12 +32,16 @@ uint8_t SCHC_Fragmenter_GW::initialize(uint8_t protocol)
                                                 SCHC_FRAG_LORAWAN,
                                                 SCHC_FRAG_UP,
                                                 i,
-                                                stack_ttn_mqtt);
+                                                stack_ttn_mqtt,
+                                                ack_mode,
+                                                error_prob);
                 _downlinkSessionPool[i].initialize(this,
                                                 SCHC_FRAG_LORAWAN,
                                                 SCHC_FRAG_DOWN,
                                                 i,
-                                                stack_ttn_mqtt);
+                                                stack_ttn_mqtt,
+                                                ack_mode,
+                                                error_prob);
                 
                 }
         }
@@ -48,11 +53,13 @@ uint8_t SCHC_Fragmenter_GW::initialize(uint8_t protocol)
 
 uint8_t SCHC_Fragmenter_GW::listen_messages(char *buffer)
 {
-        SPDLOG_TRACE("Entering the function");
+        SPDLOG_DEBUG(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+        SPDLOG_TRACE("\033[1mEntering the function\033[0m");
 
         SCHC_TTN_Parser parser;
         parser.initialize_parser(buffer);
-        SPDLOG_DEBUG("\033[1mReceiving messages from: {}\033[0m", parser.get_device_id());
+        SPDLOG_DEBUG("Receiving messages from: {}", parser.get_device_id());
+
 
         // Valida si existe una sesión asociada al deviceId.
         // Si no existe, solicita una sesion nueva.
@@ -86,14 +93,13 @@ uint8_t SCHC_Fragmenter_GW::listen_messages(char *buffer)
                 SPDLOG_ERROR("The session is not running. Discarting message");
         }
 
-        SPDLOG_TRACE("Leaving the function");
+        SPDLOG_TRACE("\033[1mLeaving the function\033[0m");
+        SPDLOG_DEBUG("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
         return 0;
 }
 
 int SCHC_Fragmenter_GW::get_free_session_id(uint8_t direction)
 {
-        SPDLOG_TRACE("Entering the function");
-
         if(_protocol==SCHC_FRAG_LORAWAN && direction==SCHC_FRAG_UP)
         {
                 for(uint8_t i=0; i<_SESSION_POOL_SIZE;i++)
@@ -101,15 +107,12 @@ int SCHC_Fragmenter_GW::get_free_session_id(uint8_t direction)
                         if(!_uplinkSessionPool[i].is_running())
                         {
                                 _uplinkSessionPool[i].set_running(true);
-                                SPDLOG_TRACE("Leaving the function");
+                                SPDLOG_TRACE("Selecting the session {}", i);
                                 return i;
                         }
                 }
                 SPDLOG_ERROR("All sessiones are used");
         }
-
-        SPDLOG_TRACE("Leaving the function");
-
         return -1;
 }
 

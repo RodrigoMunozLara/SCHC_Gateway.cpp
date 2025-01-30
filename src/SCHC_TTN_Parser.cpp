@@ -12,11 +12,11 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
         {
             _deviceId = parsed_json["end_device_ids"]["device_id"];
 
-            SPDLOG_DEBUG("DeviceID: {}", _deviceId);
+            SPDLOG_TRACE("DeviceID: {}", _deviceId);
         }
         else
         {
-            SPDLOG_WARN("The mqtt JSON message not include the \"end_device_ids\" key");
+            SPDLOG_ERROR("The mqtt JSON message not include the \"end_device_ids\" key");
             return -1;        
         }
 
@@ -28,10 +28,10 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
 
             // save and print decoded buffer (text format)
             base64_decode(frm_payload, _decoded_payload, _len);
-            SPDLOG_DEBUG("Decoded Payload (hex format):");
+            SPDLOG_TRACE("Decoded Payload (hex format):");
             SCHC_Message::print_buffer_in_hex(_decoded_payload, _len);
             
-            SPDLOG_DEBUG("Length: {}", _len);
+            SPDLOG_TRACE("Length: {}", _len);
         }
         else
         {
@@ -45,11 +45,11 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
         {
             // save and print encoded buffer
             _rule_id = parsed_json["uplink_message"]["f_port"];
-            SPDLOG_DEBUG("Rule ID: {}", _rule_id);
+            SPDLOG_TRACE("Rule ID: {}", _rule_id);
         }
         else
         {
-            SPDLOG_WARN("The mqtt JSON message not include the \"uplink_message\" and \"f_port\" keys");
+            SPDLOG_ERROR("The mqtt JSON message not include the \"uplink_message\" and \"f_port\" keys");
             return -1; 
         }
     }

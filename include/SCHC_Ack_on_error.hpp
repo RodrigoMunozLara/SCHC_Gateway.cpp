@@ -31,10 +31,12 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
         bool                    is_processing();
         void                    set_end_callback(std::function<void()> callback);
         static void             thread_entry_point(std::shared_ptr<SCHC_Ack_on_error> instance);
+        void                    set_error_prob(uint8_t error_prob);
     private: 
         uint8_t                 RX_INIT_recv_fragments(int rule_id, char *msg, int len);
         uint8_t                 RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int len);
-        uint8_t                 RX_END_end_session(int rule_id, char *msg, int len);
+        uint8_t                 RX_END_end_session(int rule_id = 0, char *msg=nullptr, int len=0);
+        uint8_t                 RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, char *msg, int len);
         std::string             get_bitmap_array_str(uint8_t window);
         std::vector<uint8_t>    get_bitmap_array_vec(uint8_t window);
         uint8_t                 get_c_from_bitmap(uint8_t window);
@@ -42,8 +44,8 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
         uint32_t                calculate_crc32(const char *data, size_t length);
         int                     get_tile_ptr(uint8_t window, uint8_t fcn);
         int                     get_bitmap_ptr(uint8_t fcn);
-        void                    print_tail_array_str();
         void                    print_tail_array_hex();
+        void                    print_bitmap_array_str();
         
 
         /* Static SCHC parameters */
@@ -62,6 +64,8 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
         char**          _tilesArray;
         uint8_t**       _bitmapArray;
         int             _last_window;   // almacena el numero de la ultima ventana
+        uint32_t        _rcs;
+        uint8_t         _error_prob;
 
 
         /* Dynamic SCHC parameters */
@@ -79,6 +83,8 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
         std::string             _name;                  // thread name
         std::thread             _process_thread;        // thread
         std::function<void()>   _end_callback;
+
+        int             _counter = 0;
 };
 
 #endif
