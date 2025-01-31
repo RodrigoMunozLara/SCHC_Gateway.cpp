@@ -83,8 +83,6 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
         std::string             _name;                  // thread name
         std::thread             _process_thread;        // thread
         std::function<void()>   _end_callback;
-
-        int             _counter = 0;
 };
 
 #endif
