@@ -38,6 +38,7 @@ uint8_t SCHC_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag
     _stack = stack_ptr;
 
    _currentState = STATE_RX_INIT;
+   _last_confirmed_window = 0;
 
 
     /* Se arranca el thread */
@@ -47,6 +48,8 @@ uint8_t SCHC_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag
     _process_thread = std::thread(&SCHC_Ack_on_error::thread_entry_point, self);
     _process_thread.detach();           // Desatachar el hilo para que sea independiente
 
+
+    _counter = 1;
 
     SPDLOG_TRACE("Leaving the function");
 
@@ -249,8 +252,6 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
     {
         if(msg_type == SCHC_REGULAR_FRAGMENT_MSG)
         {
-
-
             /* Codigo para poder eliminar mensajes de entrada */
             std::random_device rd;
             std::mt19937 gen(rd());
@@ -285,6 +286,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
             /* Se almacenan los tiles en el mapa de recepción de tiles */
             int tile_ptr    = this->get_tile_ptr(w, fcn);   // tile_ptr: posicion donde se debe almacenar el tile en el _tileArray.
             int bitmap_ptr  = this->get_bitmap_ptr(fcn);    // bitmap_ptr: posicion donde se debe comenzar escribiendo un 1 en el _bitmapArray.
+
             for(int i=0; i<tiles_in_payload; i++)
             {
                 memcpy(_tilesArray[tile_ptr + i], payload + (i*_tileSize), _tileSize);  // se almacenan los bytes de un tile recibido
@@ -431,6 +433,21 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
         {
             SPDLOG_DEBUG("Receiving a SCHC Regular fragment");
 
+            /* Codigo para poder eliminar mensajes de entrada */
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<int> dist(0, 100);
+            int random_number = dist(gen);
+            
+            //if(_counter == 10)
+            if(random_number < _error_prob)
+            {
+                    SPDLOG_WARN("\033[31mMessage discarded due to error probability\033[0m");   
+                    _counter++;
+                    return 0;
+            }
+            _counter++;
+
             /* Decoding el SCHC fragment */
             decoder.decode_message(SCHC_FRAG_LORAWAN, rule_id, msg, len);
             payload_len     = decoder.get_schc_payload_len();   // largo del payload SCHC. En bits
@@ -464,9 +481,18 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                 }
                 
             }
-            _currentTile_ptr = _currentTile_ptr + tiles_in_payload;
-            // TODO: buscar donde asignar el valor a _bitmap_ptr. Al cambiar ventana ya no puede ser _bitmap_ptr = _bitmap_ptr + tiles_in_payload
             delete[] payload;
+
+            /* Se almacena el puntero al siguiente tile esperado */
+            if((tile_ptr + tiles_in_payload) > _currentTile_ptr)
+            {
+                _currentTile_ptr = tile_ptr + tiles_in_payload;
+                SPDLOG_DEBUG("Updating _currentTile_ptr. New value is: {}", _currentTile_ptr);
+            }
+            else
+            {
+                SPDLOG_DEBUG("_currentTile_ptr is not updated. The previous value is kept {}", _currentTile_ptr);
+            }
 
             /* Se imprime mensaje de la llegada de un SCHC fragment*/
             spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
@@ -474,15 +500,21 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
             spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
             
         }
-        else if(msg_type == SCHC_ALL1_FRAGMENT_MSG)
+        else if(msg_type == SCHC_ALL1_FRAGMENT_MSG) 
         {
-            SPDLOG_DEBUG("Receiving a SCHC All-1 message");
+            SPDLOG_WARN("Receiving a SCHC All-1 message");
             decoder.decode_message(SCHC_FRAG_LORAWAN, rule_id, msg, len);
 
             _lastTileSize   = decoder.get_schc_payload_len();   // largo del payload SCHC. En bits
             w               = decoder.get_w();
             _last_window    = w;
             _rcs             = decoder.get_rcs();
+            fcn             = decoder.get_fcn();
+
+            /* Se imprime mensaje de la llegada de un SCHC fragment*/
+            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+            SPDLOG_WARN("|- W={:<1}, FCN={:<2}+RCS ->| {:>2} bits", w, fcn, _lastTileSize);
+            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
 
             decoder.get_schc_payload(_last_tile);           // obtiene el SCHC payload
 
@@ -512,38 +544,61 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
             else                        // * Integrity check: failure
             {
                 SPDLOG_INFO("Integrity check: failure");
+
                 if(_ackMode == ACK_MODE_ACK_END_SES)        // * SCH ACK at the end of the session
                 {
-                    for(int i=0; i<=_last_window; i++)
+                    for(int i = _last_confirmed_window; i<_last_window; i++)
                     {
                         int len;
                         char* buffer                = nullptr;
                         uint8_t c                   = get_c_from_bitmap(i);
-                        if(c == 0 || i == _last_window)
+                        if(c == 0)
                         {
-                            std::vector bitmap_vector   = this->get_bitmap_array_vec(w);
+                            _last_confirmed_window = i;
+                            std::vector bitmap_vector   = this->get_bitmap_array_vec(i);
                             decoder.create_schc_ack(_ruleID, dtag, i, c, bitmap_vector, buffer, len);
                             _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
                             delete[] buffer;
 
                             spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
-                            SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap:{}", i, c, get_bitmap_array_str(w));
+                            SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap:{}", i, c, get_bitmap_array_str(i));
                             spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
 
                             SPDLOG_INFO("Changing STATE: From STATE_RX_RCV_WINDOW --> STATE_RX_WAIT_x_MISSING_FRAGS");
-                            _currentState = STATE_RX_WAIT_x_MISSING_FRAGS;                        
+                            _currentState = STATE_RX_WAIT_x_MISSING_FRAGS;   
+                            return 0;                     
                         }
                         else
                         {
-                            SPDLOG_INFO("SCHC Window {} has received all tiles. No ACK sent", i);
+                            SPDLOG_WARN("SCHC Window {} has received all tiles. No ACK sent", i);
                         }
                     }
+
+                    /* Si llegó a esta parte del codigo es porque ninguna ventana tiene errores. 
+                    Por lo tanto la ventana con errores es la última.*/
+                    SPDLOG_DEBUG("Sending SCHC ACK");
+                    std::vector bitmap_vector   = this->get_bitmap_array_vec(_last_window); // obtiene el bitmap expresado como un arreglo de char    
+                    int len;
+                    char* buffer                = nullptr;
+                    int c                       = 0;
+                    decoder.create_schc_ack(_ruleID, dtag, _last_window, c, bitmap_vector, buffer, len);
+
+                    _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
+                    delete[] buffer;
+
+                    spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+                    SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap:{}", _last_window, c, get_bitmap_array_str(_last_window));
+                    spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+                    _last_confirmed_window = _last_window; 
+
+                    SPDLOG_INFO("Changing STATE: From STATE_RX_RCV_WINDOW --> STATE_RX_WAIT_x_MISSING_FRAGS");
+                    _currentState = STATE_RX_WAIT_x_MISSING_FRAGS; 
+
                 }
                 else if(_ackMode == ACK_MODE_COMPOUND_ACK)  // * SCHC Compound ACK at the end of the session
                 {
-
+                    // TODO: Construir el Compund ACK
                 }
-
             }
         }
         else if(msg_type == SCHC_ACK_REQ_MSG)
@@ -820,6 +875,205 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
             SPDLOG_ERROR("Receiving an unexpected type of message. Discarding message");
         }
     }
+    else if(_ackMode == ACK_MODE_ACK_END_SES)
+    {
+        if(msg_type == SCHC_REGULAR_FRAGMENT_MSG)
+        {
+            SPDLOG_DEBUG("Receiving a SCHC Regular fragment");
+
+        //     /* Codigo para poder eliminar mensajes de entrada */
+        //     std::random_device rd;
+        //     std::mt19937 gen(rd());
+        //     std::uniform_int_distribution<int> dist(0, 100);
+        //     int random_number = dist(gen);
+        //     if(random_number < _error_prob)
+        //     {
+        //             SPDLOG_WARN("\033[31mMessage discarded due to error probability\033[0m");   
+        //             return 0;
+        //     }
+        // }
+
+            /* Decoding el SCHC fragment */
+            decoder.decode_message(SCHC_FRAG_LORAWAN, rule_id, msg, len);
+            payload_len     = decoder.get_schc_payload_len();   // largo del payload SCHC. En bits
+            fcn             = decoder.get_fcn();
+            w               = decoder.get_w();
+
+            /* Creacion de buffer para almacenar el schc payload del SCHC fragment */
+            char* payload   = new char[payload_len/8];          // * Liberada en linea 158
+            decoder.get_schc_payload(payload);                  // obtiene el SCHC payload
+
+            /* Obteniendo la cantidad de tiles en el mensaje */
+            int tiles_in_payload = (payload_len/8)/_tileSize;
+
+            /* Se almacenan los tiles en el mapa de recepción de tiles */
+            int tile_ptr    = this->get_tile_ptr(w, fcn);   // tile_ptr: posicion donde se debe almacenar el tile en el _tileArray.
+            int bitmap_ptr  = this->get_bitmap_ptr(fcn);    // bitmap_ptr: posicion donde se debe comenzar escribiendo un 1 en el _bitmapArray.
+            for(int i=0; i<tiles_in_payload; i++)
+            {
+                memcpy(_tilesArray[tile_ptr + i], payload + (i*_tileSize), _tileSize);  // se almacenan los bytes de un tile recibido
+                _bitmapArray[w][bitmap_ptr + i] = 1;                                    // en el bitmap, se establece en 1 los correspondientes tiles recibidos
+            }
+            delete[] payload;
+
+
+            /* Se almacena el puntero al siguiente tile esperado */
+            if((tile_ptr + tiles_in_payload) > _currentTile_ptr)
+            {
+                _currentTile_ptr = tile_ptr + tiles_in_payload;
+                SPDLOG_WARN("Updating _currentTile_ptr. New value is: {}", _currentTile_ptr);
+            }
+            else
+            {
+                SPDLOG_DEBUG("_currentTile_ptr is not updated. The previous value is kept {}", _currentTile_ptr);
+            }
+
+            /* Se imprime mensaje de la llegada de un SCHC fragment*/
+            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+            SPDLOG_WARN("|--- W={:<1}, FCN={:<2} --->| {:>2} tiles", w, fcn, tiles_in_payload);
+            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+
+            /* Valida en el bitmap si se han recibido todos los tiles retransmitidos por el sender */
+            uint8_t c = this->get_c_from_bitmap(w);
+
+            if(c==1 && w!=_last_window)
+            {
+                int next_window = w + 1;
+                if(next_window == _last_window)
+                {
+                    int len;
+                    char* buffer        = nullptr;
+                    bool valid_rcs = this->check_rcs(_rcs);
+
+                    if(valid_rcs)
+                    {
+                        SPDLOG_DEBUG("Sending SCHC ACK");
+                        std::vector bitmap_vector   = this->get_bitmap_array_vec(next_window); // obtiene el bitmap expresado como un arreglo de char    
+                        int len;
+                        char* buffer                = nullptr;
+                        decoder.create_schc_ack(_ruleID, dtag, next_window, 1, bitmap_vector, buffer, len);
+
+                        _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
+                        delete[] buffer;
+
+                        spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+                        SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap:{}", next_window, 1, get_bitmap_array_str(next_window));
+                        spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+
+                        SPDLOG_INFO("Changing STATE: From STATE_RX_WAIT_x_MISSING_FRAGS --> STATE_RX_END");
+                        _currentState = STATE_RX_END;
+                    }
+                    else
+                    {
+                        SPDLOG_DEBUG("Sending SCHC ACK");
+                        std::vector bitmap_vector   = this->get_bitmap_array_vec(_last_window); // obtiene el bitmap expresado como un arreglo de char    
+                        int len;
+                        char* buffer                = nullptr;
+                        c                           = 0;
+                        decoder.create_schc_ack(_ruleID, dtag, _last_window, c, bitmap_vector, buffer, len);
+
+                        _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
+                        delete[] buffer;
+
+                        spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+                        SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap:{}", _last_window, c, get_bitmap_array_str(_last_window));
+                        spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+                        _last_confirmed_window = _last_window; 
+                    }
+                }
+                else
+                {
+                    for(int i = next_window; i<_last_window; i++)
+                    {
+                        int len;
+                        char* buffer    = nullptr;
+                        int c_i         = get_c_from_bitmap(i);
+                        if(c_i == 0)
+                        {
+                            std::vector bitmap_vector   = this->get_bitmap_array_vec(i);
+                            decoder.create_schc_ack(_ruleID, dtag, i, c_i, bitmap_vector, buffer, len);
+                            _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
+                            delete[] buffer;
+
+                            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+                            SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap:{}", i, c_i, get_bitmap_array_str(i));
+                            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+
+                            _last_confirmed_window = i; 
+                            break;  
+                        }
+                        else
+                        {
+                            SPDLOG_WARN("The SCHC gateway correctly received the tiles for window {}.", i);
+                        }
+
+                    }// cierre del for
+                }
+            }
+            else if(c==1 && w==_last_window)
+            {
+                int len;
+                char* buffer        = nullptr;
+                bool valid_rcs = this->check_rcs(_rcs);
+                if(valid_rcs)
+                {
+                    SPDLOG_DEBUG("Sending SCHC ACK");
+                    std::vector bitmap_vector   = this->get_bitmap_array_vec(_last_window); // obtiene el bitmap expresado como un arreglo de char    
+                    int len;
+                    char* buffer                = nullptr;
+                    decoder.create_schc_ack(_ruleID, dtag, _last_window, 1, bitmap_vector, buffer, len);
+
+                    _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
+                    delete[] buffer;
+
+                    spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+                    SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap:{}", _last_window, 1, get_bitmap_array_str(_last_window));
+                    spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+
+                    SPDLOG_INFO("Changing STATE: From STATE_RX_WAIT_x_MISSING_FRAGS --> STATE_RX_END");
+                    _currentState = STATE_RX_END;
+                }
+                else
+                {
+                    SPDLOG_DEBUG("Sending SCHC ACK");
+                    std::vector bitmap_vector   = this->get_bitmap_array_vec(_last_window); // obtiene el bitmap expresado como un arreglo de char    
+                    int len;
+                    char* buffer                = nullptr;
+                    c                           = 0;
+                    decoder.create_schc_ack(_ruleID, dtag, _last_window, c, bitmap_vector, buffer, len);
+
+                    _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
+                    delete[] buffer;
+
+                    spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+                    SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap:{}", _last_window, c, get_bitmap_array_str(_last_window));
+                    spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+                    _last_confirmed_window = _last_window; 
+                }
+            }
+        }
+        else if(msg_type == SCHC_ACK_REQ_MSG)
+        {
+            SPDLOG_INFO("Receiving SCHC ACK REQ");
+            /* Decoding el SCHC fragment */
+            decoder.decode_message(SCHC_FRAG_LORAWAN, rule_id, msg, len);
+            w               = _last_confirmed_window;
+
+            SPDLOG_DEBUG("Sending SCHC ACK");
+            uint8_t c                   = this->get_c_from_bitmap(w);
+            std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
+            int len;
+            char* buffer                = nullptr;
+            decoder.create_schc_ack(_ruleID, dtag, w, c, bitmap_vector, buffer, len);
+
+            _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
+            delete[] buffer;
+
+            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+            SPDLOG_WARN("|<-- ACK, W={:<1}, C={:<1} --| Bitmap:{}", w, c, get_bitmap_array_str(w));
+            spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");             
+        }
+    }
 
     return 0;
 }
@@ -832,7 +1086,7 @@ uint8_t SCHC_Ack_on_error::get_c_from_bitmap(uint8_t window)
     if(window ==_last_window)
     {
         int bitmap_ptr = _currentTile_ptr - (_last_window*_windowSize);
-        SPDLOG_WARN("bitmap_ptr: {}",bitmap_ptr);
+        //SPDLOG_WARN("bitmap_ptr: {}",bitmap_ptr);
         for (int i=0; i<bitmap_ptr; i++)
         {
             if(_bitmapArray[window][i] == 0)
@@ -974,7 +1228,7 @@ void SCHC_Ack_on_error::print_tail_array_hex()
     }
 
     // Imprimir usando spdlog
-    SPDLOG_DEBUG("Tile Array (hex): {}", resultado);
+    SPDLOG_WARN("Tile Array (hex): {}", resultado);
 
     std::string resultado2;
     for (size_t i = 0; i < _tileSize; ++i) 
@@ -982,7 +1236,7 @@ void SCHC_Ack_on_error::print_tail_array_hex()
         unsigned char valor = static_cast<unsigned char>(_last_tile[i]);
         resultado2 += fmt::format("{:02X}", valor);
     }
-    SPDLOG_DEBUG("Last Tile (hex): {}", resultado2);
+    SPDLOG_WARN("Last Tile (hex): {}", resultado2);
 
 
 }

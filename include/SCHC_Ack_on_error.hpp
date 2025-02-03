@@ -72,6 +72,7 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
         uint8_t         _currentState;
         uint8_t         _currentWindow;
         int             _currentTile_ptr;
+        uint8_t         _last_confirmed_window;
 
         /* Static LoRaWAN parameters*/
         int                 _current_L2_MTU;
@@ -83,6 +84,10 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
         std::string             _name;                  // thread name
         std::thread             _process_thread;        // thread
         std::function<void()>   _end_callback;
+
+
+
+        int _counter;
 };
 
 #endif
