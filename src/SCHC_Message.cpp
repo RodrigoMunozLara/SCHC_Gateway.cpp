@@ -138,6 +138,125 @@ uint8_t SCHC_Message::create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, 
     return 0;
 }
 
+uint8_t SCHC_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, int last_win, int c, uint8_t** bitmap_array, uint8_t win_size, char *&buffer, int &len)
+{
+    uint8_t w_mask      = 0xC0;
+    uint8_t c_mask      = 0x20;
+
+    if(c == 1)
+    {
+        // No hay errores, se agregan 5 bits de padding
+        char* schc_header   = new char[1];  // * Liberada en SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments (linea 220 y 255) y 
+        schc_header[0]  = ((last_win << 6)& w_mask) | ((c << 5) & c_mask) | 0x00;
+        buffer = schc_header;
+        len = 1;
+    }
+    else
+    {
+        /* Construye los bits del SCHC packet (header + bitmap) como un vector */
+        std::vector<uint8_t>    bits;
+        std::string             bitmap_str = "";
+        bool                    first_win_with_error = true;
+        for(int w=0; w<last_win; w++)
+        {
+            bool error_found = false;
+            for (int j=0; j<win_size; j++)
+            {
+                if(bitmap_array[w][j] == 0)
+                    error_found = true;
+            }
+
+            if(error_found && first_win_with_error)
+            {
+                // bits para w y c. Está compuesto por 2 bits. Cada bit lo almacena en un uint8_t
+                bits.push_back((w >> 1) & 0b00000001);
+                bits.push_back(w & 0b00000001);
+                bits.push_back(c & 0b00000001);
+
+                for(int i=0; i<win_size; i++)
+                {
+                    bits.push_back(bitmap_array[w][i]);
+                }
+
+                bitmap_str = bitmap_str + "W=" + std::to_string(w) + " - Bitmap:";
+                for(int i=0; i<win_size; i++)
+                {
+                    bitmap_str = bitmap_str + std::to_string(bitmap_array[w][i]);
+                }
+
+
+                first_win_with_error = false;
+            }
+            else if(error_found)
+            {
+                bits.push_back((w >> 1) & 0b00000001);
+                bits.push_back(w & 0b00000001);
+
+                for(int i=0; i<win_size; i++)
+                {
+                    bits.push_back(bitmap_array[w][i]);
+                }
+
+                bitmap_str = bitmap_str + ", W=" + std::to_string(w) + " - Bitmap:";
+                for(int i=0; i<win_size; i++)
+                {
+                    bitmap_str = bitmap_str + std::to_string(bitmap_array[w][i]);
+                }
+            }
+        }
+
+        /* Bits de la ultima ventana */
+        bits.push_back((last_win >> 1) & 0b00000001);
+        bits.push_back(last_win & 0b00000001);
+        for(int i=0; i<win_size; i++)
+        {
+            bits.push_back(bitmap_array[last_win][i]);
+        }
+
+        bitmap_str = bitmap_str + ", W=" + std::to_string(last_win) + " - Bitmap:";
+        for(int i=0; i<win_size; i++)
+        {
+            bitmap_str = bitmap_str + std::to_string(bitmap_array[last_win][i]);
+        }
+
+        /* Se agregan los bits de padding */
+        int n_paddin_bits = 8 - (bits.size()% 8);
+        for(int i=0; i< n_paddin_bits; i++)
+        {
+            bits.push_back(0);
+        }
+
+
+        /* Convirte el mensaje SCHC desde un vector a un array de char*/
+        if(bits.size()%8 == 0)
+        {
+            
+            len = bits.size()/8;
+            char* schc_header   = new char[len];
+            int k=0;
+            for(int i=0; i < len; i++)
+            {
+                schc_header[i] = ((bits[k] << 7) & 0b10000000) |
+                            ((bits[k+1] << 6) & 0b01000000) |
+                            ((bits[k+2] << 5) & 0b00100000) |
+                            ((bits[k+3] << 4) & 0b00010000) |
+                            ((bits[k+4] << 3) & 0b00001000) |
+                            ((bits[k+5] << 2) & 0b00000100) |
+                            ((bits[k+6] << 1) & 0b00000010) |
+                            (bits[k+7] & 0b00000001);
+                k = k + 8;
+            }
+            buffer = schc_header;
+        }
+
+        _compound_ack_string = bitmap_str;
+    }
+
+
+
+    return 0;
+}
+
 uint8_t SCHC_Message::get_msg_type(uint8_t protocol, int rule_id, char *msg, int len)
 {
     if(protocol==SCHC_FRAG_LORAWAN)
@@ -247,6 +366,11 @@ uint8_t SCHC_Message::get_schc_payload(char* schc_payload)
 uint32_t SCHC_Message::get_rcs()
 {
     return _rcs;
+}
+
+std::string SCHC_Message::get_compound_bitmap_str()
+{
+    return _compound_ack_string;
 }
 
 void SCHC_Message::print_buffer_in_hex(char* buffer, int len)

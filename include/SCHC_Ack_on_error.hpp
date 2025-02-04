@@ -47,6 +47,7 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
         void                    print_tail_array_hex();
         void                    print_bitmap_array_str();
         
+        
 
         /* Static SCHC parameters */
         uint8_t         _ruleID;        // Rule ID -> https://www.rfc-editor.org/rfc/rfc9011.html#name-ruleid-management
@@ -80,12 +81,13 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
 
         /* Thread and Queue Message*/
         SCHC_ThreadSafeQueue    _queue;
-        std::atomic<bool>       _processing;               // atomic flag for the thread
+        std::atomic<bool>       _processing;            // atomic flag for the thread
         std::string             _name;                  // thread name
         std::thread             _process_thread;        // thread
         std::function<void()>   _end_callback;
 
-
+        /* Flags */
+        bool                    _all_tiles_received_flag;
 
         int _counter;
 };
