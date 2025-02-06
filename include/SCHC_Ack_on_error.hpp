@@ -71,7 +71,6 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
 
         /* Dynamic SCHC parameters */
         uint8_t         _currentState;
-        uint8_t         _currentWindow;
         int             _currentTile_ptr;
         uint8_t         _last_confirmed_window;
 
@@ -88,6 +87,7 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
 
         /* Flags */
         bool                    _all_tiles_received_flag;
+        bool                    _wait_pull_ack_req_flag;    // "true": si llega un ACK REQ lo considera un PULL ACK REQ (descarta el ACK REQ y no envía nada). "false": si llega un ACK REQ responde con un ACK.
 
         int _counter;
 };
