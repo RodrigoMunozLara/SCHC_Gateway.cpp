@@ -96,9 +96,17 @@ int main() {
     // SCHC parameter
     const char* ack_mode_char   = ini.GetValue("schc", "schc_ack_mode", "Desconocido");
     const uint8_t ack_mode      = std::stoi(ack_mode_char);
+    if(ack_mode == 1)
+        SPDLOG_CRITICAL("Using SCHC parameter - ack_mode: ACK_MODE_ACK_END_WIN");
+    else if(ack_mode == 2)
+        SPDLOG_CRITICAL("Using SCHC parameter - ack_mode: ACK_MODE_ACK_END_SES");
+    else if(ack_mode == 3)
+        SPDLOG_CRITICAL("Using SCHC parameter - ack_mode: ACK_MODE_COMPOUND_ACK");
+
+
+
     const char* error_prob_char = ini.GetValue("schc", "error_prob", "Desconocido");
     const uint8_t error_prob    = std::stoi(error_prob_char);
-    SPDLOG_CRITICAL("Using SCHC parameter - ack_mode: {}", ack_mode);
     SPDLOG_CRITICAL("Using SCHC parameter - error_prob: {}", error_prob);
 
     mosquitto_lib_init();

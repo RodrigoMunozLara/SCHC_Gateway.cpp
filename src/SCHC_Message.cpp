@@ -285,13 +285,14 @@ uint8_t SCHC_Message::decode_message(uint8_t protocol, int rule_id, char *msg, i
     if(protocol==SCHC_FRAG_LORAWAN)
     {
         // Mask definition
-        uint8_t w_mask = 0xC0;
+        uint8_t w_mask = 0x03;
         uint8_t fcn_mask = 0x3F;
-        uint8_t c_mask = 0x20;
+        //uint8_t c_mask = 0x20;
 
         uint8_t schc_header = msg[0];
-        _w      = (w_mask & schc_header) >> 6;
-        _fcn    = fcn_mask & schc_header;
+        _w                  = (schc_header >> 6) & w_mask;
+        _fcn                = schc_header & fcn_mask;
+        _dtag               = 0;                            // In LoRaWAN, dtag is not used
 
         SPDLOG_DEBUG("Rule_id: {},  w header: {}, fcn header: {}", rule_id, _w, _fcn);
 
@@ -321,11 +322,6 @@ uint8_t SCHC_Message::decode_message(uint8_t protocol, int rule_id, char *msg, i
         else if (rule_id==SCHC_FRAG_UPDIR_RULE_ID && len>1)
         {
             SPDLOG_DEBUG("Decoding SCHC Regular message");
-
-            uint8_t schc_header = msg[0];
-            _w      = (w_mask & schc_header) >> 6;
-            _fcn    = fcn_mask & schc_header;
-            _dtag   = 0;                                            // In LoRaWAN, dtag is not used
 
             _schc_payload_len   = (len - 1)*8;                      // in bits
             _schc_payload       = new char[_schc_payload_len/8];    // * Liberada en linea 172. Largo del mensaje menos 1 byte del header
