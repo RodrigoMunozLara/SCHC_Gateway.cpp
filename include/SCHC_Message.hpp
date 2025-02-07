@@ -18,7 +18,7 @@ class SCHC_Message
     public:
         SCHC_Message();
         uint8_t     create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, uint8_t c, std::vector<uint8_t> bitmap_vector, char*& buffer, int& len, bool must_compress = true);
-        uint8_t     create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, int last_win, int c, uint8_t** bitmap_array, uint8_t win_size, char *&buffer, int &len);
+        uint8_t     create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, int last_win, std::vector<uint8_t> c_vector, uint8_t** bitmap_array, uint8_t win_size, char *&buffer, int &len);
         uint8_t     get_msg_type(uint8_t protocol, int rule_id, char *msg, int len);
         uint8_t     decode_message(uint8_t protocol, int rule_id, char *msg, int len);
         uint8_t     get_w();

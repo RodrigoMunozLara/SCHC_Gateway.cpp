@@ -138,14 +138,17 @@ uint8_t SCHC_Message::create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, 
     return 0;
 }
 
-uint8_t SCHC_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, int last_win, int c, uint8_t** bitmap_array, uint8_t win_size, char *&buffer, int &len)
+uint8_t SCHC_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, int last_win, std::vector<uint8_t> c_vector, uint8_t** bitmap_array, uint8_t win_size, char *&buffer, int &len)
 {
-    uint8_t w_mask      = 0xC0;
-    uint8_t c_mask      = 0x20;
-
-    if(c == 1)
+    
+    if(c_vector.empty())
     {
         // No hay errores, se agregan 5 bits de padding
+
+        uint8_t w_mask  = 0xC0;
+        uint8_t c_mask  = 0x20;
+        uint8_t c       = 1;
+
         char* schc_header   = new char[1];  // * Liberada en SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments (linea 220 y 255) y 
         schc_header[0]  = ((last_win << 6)& w_mask) | ((c << 5) & c_mask) | 0x00;
         buffer = schc_header;
@@ -157,66 +160,39 @@ uint8_t SCHC_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, in
         std::vector<uint8_t>    bits;
         std::string             bitmap_str = "";
         bool                    first_win_with_error = true;
-        for(int w=0; w<last_win; w++)
-        {
-            bool error_found = false;
-            for (int j=0; j<win_size; j++)
-            {
-                if(bitmap_array[w][j] == 0)
-                    error_found = true;
-            }
 
-            if(error_found && first_win_with_error)
+        for(int i=0; i < c_vector.size(); i++)
+        {
+            uint8_t w = c_vector[i];
+            
+            if(first_win_with_error)    // solo para la primera ventana lleva w, c y el bitmap
             {
                 // bits para w y c. Está compuesto por 2 bits. Cada bit lo almacena en un uint8_t
                 bits.push_back((w >> 1) & 0b00000001);
                 bits.push_back(w & 0b00000001);
-                bits.push_back(c & 0b00000001);
-
-                for(int i=0; i<win_size; i++)
-                {
-                    bits.push_back(bitmap_array[w][i]);
-                }
+                bits.push_back(0);      // c = 0
 
                 bitmap_str = bitmap_str + "W=" + std::to_string(w) + " - Bitmap:";
                 for(int i=0; i<win_size; i++)
                 {
-                    bitmap_str = bitmap_str + std::to_string(bitmap_array[w][i]);
+                    bits.push_back(bitmap_array[w][i]);                             // vector que se transformara en un array de char
+                    bitmap_str = bitmap_str + std::to_string(bitmap_array[w][i]);   // string para mostrar en pantalla
                 }
-
-
                 first_win_with_error = false;
             }
-            else if(error_found)
+            else                        // para el resto de las ventanas solo lleva w y el bitmap
             {
                 bits.push_back((w >> 1) & 0b00000001);
                 bits.push_back(w & 0b00000001);
 
-                for(int i=0; i<win_size; i++)
-                {
-                    bits.push_back(bitmap_array[w][i]);
-                }
-
                 bitmap_str = bitmap_str + ", W=" + std::to_string(w) + " - Bitmap:";
                 for(int i=0; i<win_size; i++)
                 {
-                    bitmap_str = bitmap_str + std::to_string(bitmap_array[w][i]);
+                    bits.push_back(bitmap_array[w][i]);                             // vector que se transformara en un array de char
+                    bitmap_str = bitmap_str + std::to_string(bitmap_array[w][i]);   // string para mostrar en pantalla
                 }
-            }
-        }
 
-        /* Bits de la ultima ventana */
-        bits.push_back((last_win >> 1) & 0b00000001);
-        bits.push_back(last_win & 0b00000001);
-        for(int i=0; i<win_size; i++)
-        {
-            bits.push_back(bitmap_array[last_win][i]);
-        }
-
-        bitmap_str = bitmap_str + ", W=" + std::to_string(last_win) + " - Bitmap:";
-        for(int i=0; i<win_size; i++)
-        {
-            bitmap_str = bitmap_str + std::to_string(bitmap_array[last_win][i]);
+            }            
         }
 
         /* Se agregan los bits de padding */
@@ -229,8 +205,7 @@ uint8_t SCHC_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, in
 
         /* Convirte el mensaje SCHC desde un vector a un array de char*/
         if(bits.size()%8 == 0)
-        {
-            
+        {    
             len = bits.size()/8;
             char* schc_header   = new char[len];
             int k=0;
@@ -251,8 +226,6 @@ uint8_t SCHC_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, in
 
         _compound_ack_string = bitmap_str;
     }
-
-
 
     return 0;
 }
