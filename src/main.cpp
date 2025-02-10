@@ -8,12 +8,12 @@
 
 #include <string>
 #include "SimpleIni.h"
-#include "SCHC_Fragmenter_GW.hpp"
+#include "SCHC_GW_Fragmenter.hpp"
 
 //Global variables
 const char* topic_1_char;
 const char *host;
-SCHC_Fragmenter_GW frag;
+SCHC_GW_Fragmenter frag;
 
 // Callbacks declaration
 void on_connect(struct mosquitto *mosq, void *obj, int rc);
@@ -138,7 +138,7 @@ int main() {
         return 1;
     }
 
-    // Initialize a SCHC_Fragmenter_GW to process the uplink and downlink messages
+    // Initialize a SCHC_GW_Fragmenter to process the uplink and downlink messages
     frag.set_mqtt_stack(mosq);
     frag.initialize(SCHC_FRAG_LORAWAN, ack_mode, error_prob);
     

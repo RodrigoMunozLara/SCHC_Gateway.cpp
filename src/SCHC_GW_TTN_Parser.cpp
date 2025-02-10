@@ -1,6 +1,6 @@
-#include "SCHC_TTN_Parser.hpp"
+#include "SCHC_GW_TTN_Parser.hpp"
 
-int SCHC_TTN_Parser::initialize_parser(char *buffer)
+int SCHC_GW_TTN_Parser::initialize_parser(char *buffer)
 {
     SPDLOG_TRACE("Entering the function");
     try{
@@ -29,7 +29,7 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
             // save and print decoded buffer (text format)
             base64_decode(frm_payload, _decoded_payload, _len);
             SPDLOG_TRACE("Decoded Payload (hex format):");
-            SCHC_Message::print_buffer_in_hex(_decoded_payload, _len);
+            SCHC_GW_Message::print_buffer_in_hex(_decoded_payload, _len);
             
             SPDLOG_TRACE("Length: {}", _len);
         }
@@ -63,32 +63,32 @@ int SCHC_TTN_Parser::initialize_parser(char *buffer)
     return 0;
 }
 
-char* SCHC_TTN_Parser::get_decoded_payload()
+char* SCHC_GW_TTN_Parser::get_decoded_payload()
 {
     return _decoded_payload;
 }
 
-int SCHC_TTN_Parser::get_payload_len()
+int SCHC_GW_TTN_Parser::get_payload_len()
 {
     return _len;
 }
 
-std::string SCHC_TTN_Parser::get_device_id()
+std::string SCHC_GW_TTN_Parser::get_device_id()
 {
     return _deviceId;
 }
 
-int SCHC_TTN_Parser::get_rule_id()
+int SCHC_GW_TTN_Parser::get_rule_id()
 {
     return _rule_id;
 }
 
-void SCHC_TTN_Parser::delete_decoded_payload()
+void SCHC_GW_TTN_Parser::delete_decoded_payload()
 {
     delete[] _decoded_payload;
 }
 
-uint8_t SCHC_TTN_Parser::base64_decode(std::string encoded, char*& decoded_buffer, int& len)
+uint8_t SCHC_GW_TTN_Parser::base64_decode(std::string encoded, char*& decoded_buffer, int& len)
 {
     static const std::string base64_chars = 
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -107,7 +107,7 @@ uint8_t SCHC_TTN_Parser::base64_decode(std::string encoded, char*& decoded_buffe
     }
     len = decoded.size();
     // Esta memoria debe liberarse cuando ya no se use mas el mensaje
-    char* buffer = new char[len];       // * Liberada en SCHC_Message::decode_message(), linea 122
+    char* buffer = new char[len];       // * Liberada en SCHC_GW_Message::decode_message(), linea 122
     std::strcpy(buffer, decoded.c_str());
     decoded_buffer = buffer;   
     return 0;

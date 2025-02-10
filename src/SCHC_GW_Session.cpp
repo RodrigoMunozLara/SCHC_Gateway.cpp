@@ -1,7 +1,7 @@
-#include "SCHC_Session_GW.hpp"
-#include "SCHC_Fragmenter_GW.hpp"
+#include "SCHC_GW_Session.hpp"
+#include "SCHC_GW_Fragmenter.hpp"
 
-uint8_t SCHC_Session_GW::initialize(SCHC_Fragmenter_GW* frag, uint8_t protocol, uint8_t direction, uint8_t session_id, SCHC_Stack_L2 *stack_ptr, uint8_t ack_mode, uint8_t error_prob)
+uint8_t SCHC_GW_Session::initialize(SCHC_GW_Fragmenter* frag, uint8_t protocol, uint8_t direction, uint8_t session_id, SCHC_GW_Stack_L2 *stack_ptr, uint8_t ack_mode, uint8_t error_prob)
 {
     SPDLOG_TRACE("Entering the function");
 
@@ -51,7 +51,7 @@ uint8_t SCHC_Session_GW::initialize(SCHC_Fragmenter_GW* frag, uint8_t protocol, 
     return 0;
 }
 
-void SCHC_Session_GW::process_message(std::string dev_id, int rule_id, char* msg, int len)
+void SCHC_GW_Session::process_message(std::string dev_id, int rule_id, char* msg, int len)
 {
 
     SPDLOG_TRACE("Entering the function.");
@@ -64,9 +64,9 @@ void SCHC_Session_GW::process_message(std::string dev_id, int rule_id, char* msg
             _dev_id     = dev_id;
 
             /* Creando e inicializando maquina de estado*/
-            _stateMachine = std::make_shared<SCHC_Ack_on_error>();
+            _stateMachine = std::make_shared<SCHC_GW_Ack_on_error>();
 
-            _stateMachine->set_end_callback(std::bind(&SCHC_Session_GW::destroyStateMachine, this));
+            _stateMachine->set_end_callback(std::bind(&SCHC_GW_Session::destroyStateMachine, this));
             _stateMachine->set_error_prob(_error_prob);
             SPDLOG_DEBUG("State machine successfully created.");
 
@@ -101,27 +101,27 @@ void SCHC_Session_GW::process_message(std::string dev_id, int rule_id, char* msg
     SPDLOG_TRACE("Leaving the function");
 }
 
-bool SCHC_Session_GW::is_running()
+bool SCHC_GW_Session::is_running()
 {
     return _is_running.load();
 }
 
-void SCHC_Session_GW::set_running(bool status)
+void SCHC_GW_Session::set_running(bool status)
 {
     _is_running.store(status);
 }
 
-bool SCHC_Session_GW::is_first_msg()
+bool SCHC_GW_Session::is_first_msg()
 {
     return _is_first_msg.load();
 }
 
-void SCHC_Session_GW::set_is_first_msg(bool status)
+void SCHC_GW_Session::set_is_first_msg(bool status)
 {
     _is_first_msg.store(status);
 }
 
-void SCHC_Session_GW::destroyStateMachine()
+void SCHC_GW_Session::destroyStateMachine()
 {
     set_running(false);
     set_is_first_msg(true);

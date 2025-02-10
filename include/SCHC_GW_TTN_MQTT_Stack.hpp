@@ -1,7 +1,7 @@
 #ifndef SCHC_TTN_Stack_hpp
 #define SCHC_TTN_Stack_hpp
 
-#include "SCHC_Stack_L2.hpp"
+#include "SCHC_GW_Stack_L2.hpp"
 #include <cstdint>
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
@@ -10,7 +10,7 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-class SCHC_TTN_MQTT_Stack: public SCHC_Stack_L2
+class SCHC_GW_TTN_MQTT_Stack: public SCHC_GW_Stack_L2
 {
     public:
         uint8_t     initialize_stack(void);

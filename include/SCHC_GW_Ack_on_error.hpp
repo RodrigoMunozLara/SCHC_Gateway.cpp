@@ -1,10 +1,10 @@
 #ifndef SCHC_Ack_on_error_hpp
 #define SCHC_Ack_on_error_hpp
 
-#include "SCHC_Macros.hpp"
-#include "SCHC_State_Machine.hpp"
-#include "SCHC_Message.hpp"
-#include "SCHC_ThreadSafeQueue.hpp"
+#include "SCHC_GW_Macros.hpp"
+#include "SCHC_GW_State_Machine.hpp"
+#include "SCHC_GW_Message.hpp"
+#include "SCHC_GW_ThreadSafeQueue.hpp"
 
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include <spdlog/spdlog.h>
@@ -17,20 +17,20 @@
 #include <thread>
 #include <functional>
 
-class SCHC_Session_GW;
+class SCHC_GW_Session;
 
-class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_from_this<SCHC_Ack_on_error>
+class SCHC_GW_Ack_on_error: public SCHC_GW_State_Machine, public std::enable_shared_from_this<SCHC_GW_Ack_on_error>
 {
     public:
-        SCHC_Ack_on_error();
-        ~SCHC_Ack_on_error();
-        uint8_t                 init(std::string dev_id, uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t m, uint8_t ackMode, SCHC_Stack_L2* stack_ptr, int retTimer, uint8_t ackReqAttempts);
+        SCHC_GW_Ack_on_error();
+        ~SCHC_GW_Ack_on_error();
+        uint8_t                 init(std::string dev_id, uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t m, uint8_t ackMode, SCHC_GW_Stack_L2* stack_ptr, int retTimer, uint8_t ackReqAttempts);
         uint8_t                 execute_machine(int rule_id=0, char *msg=NULL, int len=0);
         uint8_t                 queue_message(int rule_id, char* msg, int len);
         void                    message_reception_loop();
         bool                    is_processing();
         void                    set_end_callback(std::function<void()> callback);
-        static void             thread_entry_point(std::shared_ptr<SCHC_Ack_on_error> instance);
+        static void             thread_entry_point(std::shared_ptr<SCHC_GW_Ack_on_error> instance);
         void                    set_error_prob(uint8_t error_prob);
     private: 
         uint8_t                 RX_INIT_recv_fragments(int rule_id, char *msg, int len);
@@ -57,7 +57,7 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
         uint8_t         _nTotalTiles;   // in tiles. In LoRaWAN: 252
         uint8_t         _lastTileSize;  // in bits
         uint8_t         _tileSize;      // in bytes. In LoRaWAN: 10 bytes
-        uint8_t         _ackMode;       // Modes defined in SCHC_Macros.hpp
+        uint8_t         _ackMode;       // Modes defined in SCHC_GW_Macros.hpp
         uint32_t        _retransTimer;
         uint8_t         _maxAckReq;
         std::string     _dev_id;
@@ -76,10 +76,10 @@ class SCHC_Ack_on_error: public SCHC_State_Machine, public std::enable_shared_fr
 
         /* Static LoRaWAN parameters*/
         int                 _current_L2_MTU;
-        SCHC_Stack_L2*      _stack;
+        SCHC_GW_Stack_L2*      _stack;
 
         /* Thread and Queue Message*/
-        SCHC_ThreadSafeQueue    _queue;
+        SCHC_GW_ThreadSafeQueue    _queue;
         std::atomic<bool>       _processing;            // atomic flag for the thread
         std::string             _name;                  // thread name
         std::thread             _process_thread;        // thread

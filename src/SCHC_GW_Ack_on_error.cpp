@@ -1,17 +1,17 @@
-#include "SCHC_Ack_on_error.hpp"
-#include "SCHC_Fragmenter_GW.hpp"
+#include "SCHC_GW_Ack_on_error.hpp"
+#include "SCHC_GW_Fragmenter.hpp"
 
-SCHC_Ack_on_error::SCHC_Ack_on_error()
+SCHC_GW_Ack_on_error::SCHC_GW_Ack_on_error()
 {
-    SPDLOG_DEBUG("Calling SCHC_Ack_on_error constructor");
+    SPDLOG_DEBUG("Calling SCHC_GW_Ack_on_error constructor");
 }
 
-SCHC_Ack_on_error::~SCHC_Ack_on_error()
+SCHC_GW_Ack_on_error::~SCHC_GW_Ack_on_error()
 {
-    SPDLOG_DEBUG("Calling SCHC_Ack_on_error destructor");
+    SPDLOG_DEBUG("Calling SCHC_GW_Ack_on_error destructor");
 }
 
-uint8_t SCHC_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t m, uint8_t ackMode, SCHC_Stack_L2 *stack_ptr, int retTimer, uint8_t ackReqAttempts)
+uint8_t SCHC_GW_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag, uint8_t windowSize, uint8_t tileSize, uint8_t n, uint8_t m, uint8_t ackMode, SCHC_GW_Stack_L2 *stack_ptr, int retTimer, uint8_t ackReqAttempts)
 {
     SPDLOG_TRACE("Entering the function");
 
@@ -23,7 +23,7 @@ uint8_t SCHC_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag
     _nTotalTiles        = windowSize * pow(2,m);    // in tiles. In LoRaWAN: 252
     _lastTileSize       = 0;                        // in bits
     _tileSize           = tileSize;                 // in bytes. In LoRaWAN: 10 bytes
-    _ackMode            = ackMode;                  // Modes defined in SCHC_Macros.hpp
+    _ackMode            = ackMode;                  // Modes defined in SCHC_GW_Macros.hpp
     _retransTimer       = retTimer;                 // in minutes. In LoRaWAN: 12*60*60 minutes
     _maxAckReq          = ackReqAttempts;           // in minutes. In LoRaWAN: 12*60*60 minutes
     _last_window        = 0;
@@ -46,7 +46,7 @@ uint8_t SCHC_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag
     /* Thread and Queue Message*/
     _processing.store(true);
     auto self       = shared_from_this();     // Crear un shared_ptr que apunta a este objeto
-    _process_thread = std::thread(&SCHC_Ack_on_error::thread_entry_point, self);
+    _process_thread = std::thread(&SCHC_GW_Ack_on_error::thread_entry_point, self);
     _process_thread.detach();           // Desatachar el hilo para que sea independiente
 
 
@@ -62,7 +62,7 @@ uint8_t SCHC_Ack_on_error::init(std::string dev_id, uint8_t ruleID, uint8_t dTag
     return 0;
 }
 
-uint8_t SCHC_Ack_on_error::execute_machine(int rule_id, char *msg, int len)
+uint8_t SCHC_GW_Ack_on_error::execute_machine(int rule_id, char *msg, int len)
 {
     SPDLOG_TRACE("Entering the function");
 
@@ -111,13 +111,13 @@ uint8_t SCHC_Ack_on_error::execute_machine(int rule_id, char *msg, int len)
     return 0;
 }
 
-uint8_t SCHC_Ack_on_error::queue_message(int rule_id, char *msg, int len)
+uint8_t SCHC_GW_Ack_on_error::queue_message(int rule_id, char *msg, int len)
 {
     _queue.push(rule_id, msg, len);
     return 0;
 }
 
-void SCHC_Ack_on_error::thread_entry_point(std::shared_ptr<SCHC_Ack_on_error> instance)
+void SCHC_GW_Ack_on_error::thread_entry_point(std::shared_ptr<SCHC_GW_Ack_on_error> instance)
 {
     if (instance)
     {
@@ -125,12 +125,12 @@ void SCHC_Ack_on_error::thread_entry_point(std::shared_ptr<SCHC_Ack_on_error> in
     }
 }
 
-void SCHC_Ack_on_error::set_error_prob(uint8_t error_prob)
+void SCHC_GW_Ack_on_error::set_error_prob(uint8_t error_prob)
 {
     this->_error_prob = error_prob;
 }
 
-void SCHC_Ack_on_error::message_reception_loop()
+void SCHC_GW_Ack_on_error::message_reception_loop()
 {
     SPDLOG_INFO("Entering message_reception_loop()");
     while(_processing.load())
@@ -177,25 +177,25 @@ void SCHC_Ack_on_error::message_reception_loop()
     return;
 }
 
-bool SCHC_Ack_on_error::is_processing()
+bool SCHC_GW_Ack_on_error::is_processing()
 {
     return _processing.load();
 }
 
-void SCHC_Ack_on_error::set_end_callback(std::function<void()> callback)
+void SCHC_GW_Ack_on_error::set_end_callback(std::function<void()> callback)
 {
     _end_callback = callback;
 }
 
-uint8_t SCHC_Ack_on_error::RX_INIT_recv_fragments(int rule_id, char *msg, int len)
+uint8_t SCHC_GW_Ack_on_error::RX_INIT_recv_fragments(int rule_id, char *msg, int len)
 {
     /* memory allocated for pointers of each tile. */
-    _tilesArray = new char*[_nTotalTiles];          // * Liberada en SCHC_Ack_on_error::destroy_machine()
+    _tilesArray = new char*[_nTotalTiles];          // * Liberada en SCHC_GW_Ack_on_error::destroy_machine()
 
     /* memory allocated for the bytes for each tile. */  
     for(int i = 0 ; i < _nTotalTiles ; i++ )
     {
-        _tilesArray[i] = new char[_tileSize];       // * Liberada en SCHC_Ack_on_error::destroy_machine()
+        _tilesArray[i] = new char[_tileSize];       // * Liberada en SCHC_GW_Ack_on_error::destroy_machine()
     }
 
     /* Setting all tiles in 0x00 (for good printing in string format) */
@@ -209,7 +209,7 @@ uint8_t SCHC_Ack_on_error::RX_INIT_recv_fragments(int rule_id, char *msg, int le
 
 
     /* memory allocated for the bytes for the last tile. */  
-    _last_tile = new char[_tileSize];       // * Liberada en SCHC_Ack_on_error::destroy_machine()
+    _last_tile = new char[_tileSize];       // * Liberada en SCHC_GW_Ack_on_error::destroy_machine()
     for(int i=0; i < _tileSize; i++)
         {
             _last_tile[i] = 0x00;
@@ -217,12 +217,12 @@ uint8_t SCHC_Ack_on_error::RX_INIT_recv_fragments(int rule_id, char *msg, int le
 
 
     /* memory allocated for pointers of each bitmap. */
-    _bitmapArray = new uint8_t*[_nMaxWindows];      // * Liberada en SCHC_Ack_on_error::destroy_machine()
+    _bitmapArray = new uint8_t*[_nMaxWindows];      // * Liberada en SCHC_GW_Ack_on_error::destroy_machine()
 
     /* memory allocated for the 1s and 0s for each bitmap. */ 
     for(int i = 0 ; i < _nMaxWindows ; i++ )
     {
-        _bitmapArray[i] = new uint8_t[_windowSize]; // * Liberada en SCHC_Ack_on_error::destroy_machine()
+        _bitmapArray[i] = new uint8_t[_windowSize]; // * Liberada en SCHC_GW_Ack_on_error::destroy_machine()
     }
 
     /* Setting all bitmaps in 0*/
@@ -242,10 +242,10 @@ uint8_t SCHC_Ack_on_error::RX_INIT_recv_fragments(int rule_id, char *msg, int le
     return 0;
 }
 
-uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int len)
+uint8_t SCHC_GW_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int len)
 {
-    SCHC_Message    decoder;
-    uint8_t         msg_type;       // message type decoded. See message type in SCHC_Macros.hpp
+    SCHC_GW_Message    decoder;
+    uint8_t         msg_type;       // message type decoded. See message type in SCHC_GW_Macros.hpp
     uint8_t         w;              // w recibido en el mensaje
     uint8_t         dtag;           // dtag recibido en el mensajes
     uint8_t         fcn;            // fcn recibido en el mensaje
@@ -326,7 +326,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
             if((fcn - tiles_in_payload) <= 0)
             {
                 SPDLOG_DEBUG("Sending SCHC ACK");
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 uint8_t c                   = this->get_c_from_bitmap(w);    // obtiene el valor de c en base al _bitmap_array
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                 int len;
@@ -404,7 +404,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                 _bitmapArray[w][_windowSize-1] = 1;
 
                 SPDLOG_DEBUG("Sending SCHC ACK");
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 uint8_t c                   = 0;
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                 int len;
@@ -450,7 +450,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                 spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
 
                 SPDLOG_DEBUG("Sending SCHC ACK");
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 uint8_t c                   = this->get_c_from_bitmap(w);    // obtiene el valor de c en base al _bitmap_array
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char 
                 int len;
@@ -583,7 +583,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
 
                 SPDLOG_DEBUG("Sending SCHC ACK");
 
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 uint8_t c                   = get_c_from_bitmap(w);                     // obtiene el valor de c en base al _bitmap_array
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                 int len;
@@ -618,7 +618,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                     {
                         SPDLOG_DEBUG("Sending SCHC ACK");
 
-                        SCHC_Message    encoder;
+                        SCHC_GW_Message    encoder;
                         _last_confirmed_window      = i;
                         std::vector bitmap_vector   = this->get_bitmap_array_vec(i);
 
@@ -647,7 +647,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                 /* Si llegó a esta parte del codigo es porque ninguna ventana tiene errores. 
                 Por lo tanto la ventana con errores es la última.*/
                 SPDLOG_DEBUG("Sending SCHC ACK");
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(_last_window); // obtiene el bitmap expresado como un arreglo de char    
                 int len;
                 char* buffer                = nullptr;
@@ -708,7 +708,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                     {
                         SPDLOG_DEBUG("Sending SCHC ACK");
 
-                        SCHC_Message    encoder;
+                        SCHC_GW_Message    encoder;
                         _last_confirmed_window      = i;
                         std::vector bitmap_vector   = this->get_bitmap_array_vec(i);
 
@@ -737,7 +737,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                 /* Si llegó a esta parte del codigo es porque ninguna ventana tiene errores. 
                 Por lo tanto la ventana con errores es la última.*/
                 SPDLOG_DEBUG("Sending SCHC ACK");
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(_last_window); // obtiene el bitmap expresado como un arreglo de char    
                 int len;
                 char* buffer                = nullptr;
@@ -865,7 +865,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
 
                 SPDLOG_DEBUG("Sending SCHC Compound ACK");
 
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 int len;
                 char* buffer    = nullptr;
                 std::vector<uint8_t> windows_with_error;   // vector vacío
@@ -902,7 +902,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                 windows_with_error.push_back(_last_window);
          
 
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 int len;
                 char* buffer    = nullptr;
                 encoder.create_schc_ack_compound(_ruleID, dtag, _last_window, windows_with_error, _bitmapArray, _windowSize, buffer, len);
@@ -954,7 +954,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                 if(rcs_result)    // * Integrity check: success
                 {
                     SPDLOG_DEBUG("Sending SCHC Compound ACK");
-                    SCHC_Message    encoder;
+                    SCHC_GW_Message    encoder;
                     int len;
                     char* buffer    = nullptr;
                     std::vector<uint8_t> windows_with_error;   // vector vacío
@@ -984,7 +984,7 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
                     }
                     windows_with_error.push_back(_last_window);                       
  
-                    SCHC_Message    encoder;
+                    SCHC_GW_Message    encoder;
                     int len;
                     char* buffer    = nullptr;
                     encoder.create_schc_ack_compound(_ruleID, dtag, _last_window, windows_with_error, _bitmapArray, _windowSize, buffer, len);
@@ -1010,12 +1010,12 @@ uint8_t SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, int
     return 0;
 }
 
-uint8_t SCHC_Ack_on_error::RX_END_end_session(int rule_id, char *msg, int len)
+uint8_t SCHC_GW_Ack_on_error::RX_END_end_session(int rule_id, char *msg, int len)
 {
     if(msg!=nullptr)
     {
-        SCHC_Message    decoder;
-        uint8_t         msg_type;       // message type decoded. See message type in SCHC_Macros.hpp
+        SCHC_GW_Message    decoder;
+        uint8_t         msg_type;       // message type decoded. See message type in SCHC_GW_Macros.hpp
         uint8_t         w;              // w recibido en el mensaje
         uint8_t         dtag;           // dtag recibido en el mensajes
         uint8_t         fcn;            // fcn recibido en el mensaje
@@ -1050,10 +1050,10 @@ uint8_t SCHC_Ack_on_error::RX_END_end_session(int rule_id, char *msg, int len)
     return 0;
 }
 
-uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, char *msg, int len)
+uint8_t SCHC_GW_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, char *msg, int len)
 {
-    SCHC_Message    decoder;
-    uint8_t         msg_type;       // message type decoded. See message type in SCHC_Macros.hpp
+    SCHC_GW_Message    decoder;
+    uint8_t         msg_type;       // message type decoded. See message type in SCHC_GW_Macros.hpp
     uint8_t         w;              // w recibido en el mensaje
     uint8_t         dtag;           // dtag recibido en el mensajes
     uint8_t         fcn;            // fcn recibido en el mensaje
@@ -1151,7 +1151,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                 {
                     SPDLOG_DEBUG("Sending SCHC ACK");
 
-                    SCHC_Message    encoder;
+                    SCHC_GW_Message    encoder;
                     std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                     int len;
                     char* buffer                = nullptr;
@@ -1172,7 +1172,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
             else if((w != _last_window) && (c==1))
             {
                 SPDLOG_DEBUG("Sending SCHC ACK");
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
 
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                 int len;
@@ -1247,7 +1247,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                     {
                         SPDLOG_DEBUG("Sending SCHC ACK");
 
-                        SCHC_Message    encoder;
+                        SCHC_GW_Message    encoder;
                         std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                         int len;
                         char* buffer                = nullptr;
@@ -1269,7 +1269,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                 {
                     SPDLOG_DEBUG("Sending SCHC ACK");
 
-                    SCHC_Message    encoder;
+                    SCHC_GW_Message    encoder;
                     std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                     int len;
                     char* buffer                = nullptr;
@@ -1291,7 +1291,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                 {
                     SPDLOG_DEBUG("Sending SCHC ACK");
 
-                    SCHC_Message    encoder;
+                    SCHC_GW_Message    encoder;
                     std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                     int len;
                     char* buffer                = nullptr;
@@ -1360,7 +1360,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
 
                 SPDLOG_DEBUG("Sending SCHC ACK");
 
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 uint8_t c                   = 0;
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                 int len;
@@ -1470,7 +1470,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                     {
                         SPDLOG_DEBUG("Sending SCHC ACK");
 
-                        SCHC_Message    encoder;
+                        SCHC_GW_Message    encoder;
                         std::vector bitmap_vector   = this->get_bitmap_array_vec(_last_window); // obtiene el bitmap expresado como un arreglo de char    
                         int len;
                         char* buffer                = nullptr;
@@ -1500,7 +1500,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                         {
                             SPDLOG_DEBUG("Sending SCHC ACK");
 
-                            SCHC_Message    encoder;
+                            SCHC_GW_Message    encoder;
                             std::vector bitmap_vector   = this->get_bitmap_array_vec(i);
 
                             encoder.create_schc_ack(_ruleID, dtag, i, c_i, bitmap_vector, buffer, len);
@@ -1551,7 +1551,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                 {
                     SPDLOG_DEBUG("Sending SCHC ACK");
 
-                    SCHC_Message    encoder;
+                    SCHC_GW_Message    encoder;
                     std::vector bitmap_vector   = this->get_bitmap_array_vec(_last_window); // obtiene el bitmap expresado como un arreglo de char    
                     int len;
                     char* buffer                = nullptr;
@@ -1606,7 +1606,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                     {
                         SPDLOG_DEBUG("Sending SCHC ACK");
 
-                        SCHC_Message    encoder;
+                        SCHC_GW_Message    encoder;
                         _last_confirmed_window      = i;
                         std::vector bitmap_vector   = this->get_bitmap_array_vec(i);
 
@@ -1632,7 +1632,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                 /* Si llegó a esta parte del codigo es porque ninguna ventana tiene errores. 
                 Por lo tanto la ventana con errores es la última.*/
                 SPDLOG_DEBUG("Sending SCHC ACK");
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(_last_window); // obtiene el bitmap expresado como un arreglo de char    
                 int len;
                 char* buffer                = nullptr;
@@ -1700,7 +1700,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
 
                 SPDLOG_DEBUG("Sending SCHC ACK");
 
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 uint8_t c                   = 0;
                 std::vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                 int len;
@@ -1787,7 +1787,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
             if(rcs_result)
             {
                 SPDLOG_DEBUG("Sending SCHC Compound ACK");
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 int len;
                 char* buffer                = nullptr;
                 std::vector<uint8_t>        windows_with_error;
@@ -1838,7 +1838,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                 if(rcs_result)
                 {
                     SPDLOG_DEBUG("Sending SCHC Compound ACK");
-                    SCHC_Message    encoder;
+                    SCHC_GW_Message    encoder;
                     int len;
                     char* buffer                = nullptr;
                     std::vector<uint8_t> windows_with_error;
@@ -1869,7 +1869,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                     }
                     windows_with_error.push_back(_last_window);
 
-                    SCHC_Message    encoder;
+                    SCHC_GW_Message    encoder;
                     int len;
                     char* buffer                = nullptr;
                     encoder.create_schc_ack_compound(_ruleID, dtag, _last_window, windows_with_error, _bitmapArray, _windowSize, buffer, len);
@@ -1947,7 +1947,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
                 windows_with_error.push_back(_last_window);
          
 
-                SCHC_Message    encoder;
+                SCHC_GW_Message    encoder;
                 int len;
                 char* buffer    = nullptr;
                 encoder.create_schc_ack_compound(_ruleID, dtag, _last_window, windows_with_error, _bitmapArray, _windowSize, buffer, len);
@@ -1967,7 +1967,7 @@ uint8_t SCHC_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id, c
     return 0;
 }
 
-uint8_t SCHC_Ack_on_error::get_c_from_bitmap(uint8_t window)
+uint8_t SCHC_GW_Ack_on_error::get_c_from_bitmap(uint8_t window)
 {
     /* La funcion indica si faltan tiles para la ventana pasada como argumento.
     Retorna un 1 si no faltan tiles y 0 si faltan tiles */
@@ -1998,7 +1998,7 @@ uint8_t SCHC_Ack_on_error::get_c_from_bitmap(uint8_t window)
     return 1;
 }
 
-std::vector<uint8_t> SCHC_Ack_on_error::get_bitmap_array_vec(uint8_t window)
+std::vector<uint8_t> SCHC_GW_Ack_on_error::get_bitmap_array_vec(uint8_t window)
 {
     std::vector<uint8_t> bitmap_v;
     for(int i=0; i<_windowSize; i++)
@@ -2009,7 +2009,7 @@ std::vector<uint8_t> SCHC_Ack_on_error::get_bitmap_array_vec(uint8_t window)
     return bitmap_v;
 }
 
-bool SCHC_Ack_on_error::check_rcs(uint32_t rcs)
+bool SCHC_GW_Ack_on_error::check_rcs(uint32_t rcs)
 {
     // Calcular el tamaño total necesario para el buffer de todos los tiles
     int total_size = (_currentTile_ptr * _tileSize) + _lastTileSize/8;
@@ -2044,7 +2044,7 @@ bool SCHC_Ack_on_error::check_rcs(uint32_t rcs)
         return false;
 }
 
-uint32_t SCHC_Ack_on_error::calculate_crc32(const char *data, size_t length) 
+uint32_t SCHC_GW_Ack_on_error::calculate_crc32(const char *data, size_t length) 
 {
     // Polinomio CRC32 (reflejado)
     const uint32_t polynomial = 0xEDB88320;
@@ -2067,7 +2067,7 @@ uint32_t SCHC_Ack_on_error::calculate_crc32(const char *data, size_t length)
     return crc ^ 0xFFFFFFFF;
 }
 
-int SCHC_Ack_on_error::get_tile_ptr(uint8_t window, uint8_t fcn)
+int SCHC_GW_Ack_on_error::get_tile_ptr(uint8_t window, uint8_t fcn)
 {
     if(window==0)
     {
@@ -2088,12 +2088,12 @@ int SCHC_Ack_on_error::get_tile_ptr(uint8_t window, uint8_t fcn)
     return -1;
 }
 
-int SCHC_Ack_on_error::get_bitmap_ptr(uint8_t fcn)
+int SCHC_GW_Ack_on_error::get_bitmap_ptr(uint8_t fcn)
 {
     return (_windowSize - 1) - fcn;
 }
 
-void SCHC_Ack_on_error::print_tail_array_hex()
+void SCHC_GW_Ack_on_error::print_tail_array_hex()
 {
     // Calcular el tamaño total necesario para el buffer de todos los tiles
     int len = _nTotalTiles * _tileSize;   // 2520 bytes
@@ -2133,7 +2133,7 @@ void SCHC_Ack_on_error::print_tail_array_hex()
 
 }
 
-void SCHC_Ack_on_error::print_bitmap_array_str()
+void SCHC_GW_Ack_on_error::print_bitmap_array_str()
 {
     for(int i=0; i<_nMaxWindows; i++)
     {
@@ -2143,7 +2143,7 @@ void SCHC_Ack_on_error::print_bitmap_array_str()
     }
 }
 
-std::string SCHC_Ack_on_error::get_bitmap_array_str(uint8_t window)
+std::string SCHC_GW_Ack_on_error::get_bitmap_array_str(uint8_t window)
 {
     std::string bitmap_str = "";
     for(int i=0; i<_windowSize; i++)

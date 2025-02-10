@@ -1,6 +1,6 @@
-#include "SCHC_TTN_MQTT_Stack.hpp"
+#include "SCHC_GW_TTN_MQTT_Stack.hpp"
 
-uint8_t SCHC_TTN_MQTT_Stack::initialize_stack(void)
+uint8_t SCHC_GW_TTN_MQTT_Stack::initialize_stack(void)
 {
     CSimpleIniA ini;
     ini.SetUnicode();
@@ -19,7 +19,7 @@ uint8_t SCHC_TTN_MQTT_Stack::initialize_stack(void)
     return 0;
 }
 
-uint8_t SCHC_TTN_MQTT_Stack::send_downlink_frame(std::string dev_id, uint8_t ruleID, char *msg, int len)
+uint8_t SCHC_GW_TTN_MQTT_Stack::send_downlink_frame(std::string dev_id, uint8_t ruleID, char *msg, int len)
 {
     std::string topic = "v3/" + std::string(_mqqt_username) + "/devices/" + dev_id + "/down/push";
 
@@ -71,30 +71,30 @@ uint8_t SCHC_TTN_MQTT_Stack::send_downlink_frame(std::string dev_id, uint8_t rul
     return 0;
 }
 
-int SCHC_TTN_MQTT_Stack::getMtu(bool consider_Fopt)
+int SCHC_GW_TTN_MQTT_Stack::getMtu(bool consider_Fopt)
 {
     // TODO: obtener el MTU para enviar mensajes a TTN por MQTT. 
     // ? ¿Que pasa cuando el mensaje es mas grande que el MTU soportado por el DR en el downlink?
     return 0;
 }
 
-uint8_t SCHC_TTN_MQTT_Stack::set_mqtt_stack(mosquitto *mosqStack)
+uint8_t SCHC_GW_TTN_MQTT_Stack::set_mqtt_stack(mosquitto *mosqStack)
 {
     this->_mosq = mosqStack;
     return 0;
 }
 
-void SCHC_TTN_MQTT_Stack::set_application_id(std::string app)
+void SCHC_GW_TTN_MQTT_Stack::set_application_id(std::string app)
 {
     _application_id = app;
 }
 
-void SCHC_TTN_MQTT_Stack::set_tenant_id(std::string tenant)
+void SCHC_GW_TTN_MQTT_Stack::set_tenant_id(std::string tenant)
 {
     _tenant_id = tenant;
 }
 
-std::string SCHC_TTN_MQTT_Stack::base64_encode(const char* buffer, int len) {
+std::string SCHC_GW_TTN_MQTT_Stack::base64_encode(const char* buffer, int len) {
     static const std::string base64_chars = 
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"

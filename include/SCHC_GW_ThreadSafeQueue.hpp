@@ -1,12 +1,12 @@
-#ifndef SCHC_ThreadSafeQueue_hpp
-#define SCHC_ThreadSafeQueue_hpp
+#ifndef SCHC_GW_ThreadSafeQueue_hpp
+#define SCHC_GW_ThreadSafeQueue_hpp
 
 #include <iostream>
 #include <queue>
 #include <mutex>
 #include <thread>
 
-class SCHC_ThreadSafeQueue {
+class SCHC_GW_ThreadSafeQueue {
     public:
         void push(uint8_t rule_id, char* mesg, int len);
         bool pop(uint8_t& rule_id, char*& mesg, int& len);

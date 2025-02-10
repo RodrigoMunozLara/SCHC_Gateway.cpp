@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 #add_definitions(-D_GLIBCXX_DEBUG)   # Opcional para depuración de la STL
-#set(CMAKE_BUILD_TYPE Debug)         # Comentar para compilar sin debugging
+set(CMAKE_BUILD_TYPE Debug)         # Comentar para compilar sin debugging
 
 # Buscar las bibliotecas fmt y spdlog con versiones específicas
 find_package(PkgConfig REQUIRED)

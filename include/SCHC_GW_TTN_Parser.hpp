@@ -1,5 +1,5 @@
-#ifndef SCHC_TTN_Parser_hpp
-#define SCHC_TTN_Parser_hpp
+#ifndef SCHC_GW_TTN_Parser_hpp
+#define SCHC_GW_TTN_Parser_hpp
 
 #include <cstdint>
 #include <nlohmann/json.hpp>
@@ -10,11 +10,11 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <iostream>
-#include "SCHC_Message.hpp"
+#include "SCHC_GW_Message.hpp"
 
 using json = nlohmann::json;
 
-class SCHC_TTN_Parser
+class SCHC_GW_TTN_Parser
 {
     public:
         int         initialize_parser(char *buffer);

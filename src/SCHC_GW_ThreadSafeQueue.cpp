@@ -1,11 +1,11 @@
-#include "SCHC_ThreadSafeQueue.hpp"
+#include "SCHC_GW_ThreadSafeQueue.hpp"
 
-void SCHC_ThreadSafeQueue::push(uint8_t rule_id, char* mesg, int len) {
+void SCHC_GW_ThreadSafeQueue::push(uint8_t rule_id, char* mesg, int len) {
     std::lock_guard<std::mutex> lock(_mutex);
     _queue.push({rule_id, mesg, len});
 }
 
-bool SCHC_ThreadSafeQueue::pop(uint8_t& rule_id, char*& mesg, int& len) {
+bool SCHC_GW_ThreadSafeQueue::pop(uint8_t& rule_id, char*& mesg, int& len) {
     std::lock_guard<std::mutex> lock(_mutex);
     if(_queue.empty())
     {
@@ -22,12 +22,12 @@ bool SCHC_ThreadSafeQueue::pop(uint8_t& rule_id, char*& mesg, int& len) {
     }
 }
 
-bool SCHC_ThreadSafeQueue::empty() {
+bool SCHC_GW_ThreadSafeQueue::empty() {
     std::lock_guard<std::mutex> lock(_mutex);
     return _queue.empty();
 }
 
-size_t SCHC_ThreadSafeQueue::size()
+size_t SCHC_GW_ThreadSafeQueue::size()
 {
     std::lock_guard<std::mutex> lock(_mutex);
     return _queue.size();

@@ -1,10 +1,10 @@
-#include "SCHC_Message.hpp"
+#include "SCHC_GW_Message.hpp"
 
-SCHC_Message::SCHC_Message()
+SCHC_GW_Message::SCHC_GW_Message()
 {
 }
 
-uint8_t SCHC_Message::create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, uint8_t c, std::vector<uint8_t> bitmap_vector, char*& buffer, int& len, bool must_compress)
+uint8_t SCHC_GW_Message::create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, uint8_t c, std::vector<uint8_t> bitmap_vector, char*& buffer, int& len, bool must_compress)
 {
     uint8_t w_mask      = 0xC0;
     uint8_t c_mask      = 0x20;
@@ -12,7 +12,7 @@ uint8_t SCHC_Message::create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, 
     if(c == 1)
     {
         // No hay errores, se agregan 5 bits de padding
-        char* schc_header   = new char[1];  // * Liberada en SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments (linea 220 y 255) y 
+        char* schc_header   = new char[1];  // * Liberada en SCHC_GW_Ack_on_error::RX_RCV_WIN_recv_fragments (linea 220 y 255) y 
         schc_header[0]  = ((w << 6)& w_mask) | ((c << 5) & c_mask) | 0x00;
         buffer = schc_header;
         len = 1;
@@ -138,7 +138,7 @@ uint8_t SCHC_Message::create_schc_ack(uint8_t rule_id, uint8_t dtag, uint8_t w, 
     return 0;
 }
 
-uint8_t SCHC_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, int last_win, std::vector<uint8_t> c_vector, uint8_t** bitmap_array, uint8_t win_size, char *&buffer, int &len)
+uint8_t SCHC_GW_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, int last_win, std::vector<uint8_t> c_vector, uint8_t** bitmap_array, uint8_t win_size, char *&buffer, int &len)
 {
     
     if(c_vector.empty())
@@ -149,7 +149,7 @@ uint8_t SCHC_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, in
         uint8_t c_mask  = 0x20;
         uint8_t c       = 1;
 
-        char* schc_header   = new char[1];  // * Liberada en SCHC_Ack_on_error::RX_RCV_WIN_recv_fragments (linea 220 y 255) y 
+        char* schc_header   = new char[1];  // * Liberada en SCHC_GW_Ack_on_error::RX_RCV_WIN_recv_fragments (linea 220 y 255) y 
         schc_header[0]  = ((last_win << 6)& w_mask) | ((c << 5) & c_mask) | 0x00;
         buffer = schc_header;
         len = 1;
@@ -230,7 +230,7 @@ uint8_t SCHC_Message::create_schc_ack_compound(uint8_t rule_id, uint8_t dtag, in
     return 0;
 }
 
-uint8_t SCHC_Message::get_msg_type(uint8_t protocol, int rule_id, char *msg, int len)
+uint8_t SCHC_GW_Message::get_msg_type(uint8_t protocol, int rule_id, char *msg, int len)
 {
     if(protocol==SCHC_FRAG_LORAWAN)
     {
@@ -253,7 +253,7 @@ uint8_t SCHC_Message::get_msg_type(uint8_t protocol, int rule_id, char *msg, int
 
 }
 
-uint8_t SCHC_Message::decode_message(uint8_t protocol, int rule_id, char *msg, int len)
+uint8_t SCHC_GW_Message::decode_message(uint8_t protocol, int rule_id, char *msg, int len)
 {
     if(protocol==SCHC_FRAG_LORAWAN)
     {
@@ -302,47 +302,47 @@ uint8_t SCHC_Message::decode_message(uint8_t protocol, int rule_id, char *msg, i
         }   
     }
 
-    delete[] msg;   // * Libera la memoria solicitada en SCHC_TTN_Parser::base64_decode(), linea 110
+    delete[] msg;   // * Libera la memoria solicitada en SCHC_GW_TTN_Parser::base64_decode(), linea 110
     return 0;
 }
 
-uint8_t SCHC_Message::get_w()
+uint8_t SCHC_GW_Message::get_w()
 {
     return _w;
 }
 
-uint8_t SCHC_Message::get_fcn()
+uint8_t SCHC_GW_Message::get_fcn()
 {
     return _fcn;
 }
 
-uint8_t SCHC_Message::get_dtag()
+uint8_t SCHC_GW_Message::get_dtag()
 {
     return _dtag;
 }
 
-int SCHC_Message::get_schc_payload_len()
+int SCHC_GW_Message::get_schc_payload_len()
 {
     return _schc_payload_len;
 }
 
-uint8_t SCHC_Message::get_schc_payload(char* schc_payload)
+uint8_t SCHC_GW_Message::get_schc_payload(char* schc_payload)
 {
     memcpy(schc_payload, _schc_payload, _schc_payload_len/8);
     return 0;
 }
 
-uint32_t SCHC_Message::get_rcs()
+uint32_t SCHC_GW_Message::get_rcs()
 {
     return _rcs;
 }
 
-std::string SCHC_Message::get_compound_bitmap_str()
+std::string SCHC_GW_Message::get_compound_bitmap_str()
 {
     return _compound_ack_string;
 }
 
-void SCHC_Message::print_buffer_in_hex(char* buffer, int len)
+void SCHC_GW_Message::print_buffer_in_hex(char* buffer, int len)
 {
     std::ostringstream oss;
     for (int i = 0; i < len; ++i) 
@@ -352,12 +352,12 @@ void SCHC_Message::print_buffer_in_hex(char* buffer, int len)
     SPDLOG_TRACE("{}", oss.str());
 }
 
-void SCHC_Message::delete_schc_payload()
+void SCHC_GW_Message::delete_schc_payload()
 {
     delete[] _schc_payload;
 }
 
-void SCHC_Message::printMsg(uint8_t protocol, uint8_t msgType, char *msg, int len)
+void SCHC_GW_Message::printMsg(uint8_t protocol, uint8_t msgType, char *msg, int len)
 {
     char* buff = new char[100]; // * Liberada en linea 240
     if(msgType==SCHC_REGULAR_FRAGMENT_MSG)

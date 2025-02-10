@@ -1,12 +1,12 @@
-#include "SCHC_Fragmenter_GW.hpp"
+#include "SCHC_GW_Fragmenter.hpp"
 
-uint8_t SCHC_Fragmenter_GW::set_mqtt_stack(mosquitto *mosqStack)
+uint8_t SCHC_GW_Fragmenter::set_mqtt_stack(mosquitto *mosqStack)
 {
         _mosq = mosqStack;
         return 0;
 }
 
-uint8_t SCHC_Fragmenter_GW::initialize(uint8_t protocol, uint8_t ack_mode, uint8_t error_prob)
+uint8_t SCHC_GW_Fragmenter::initialize(uint8_t protocol, uint8_t ack_mode, uint8_t error_prob)
 {
         SPDLOG_TRACE("Entering the function");
         _protocol = protocol;
@@ -17,8 +17,8 @@ uint8_t SCHC_Fragmenter_GW::initialize(uint8_t protocol, uint8_t ack_mode, uint8
                 SPDLOG_DEBUG("Initializing mqtt stack to connect to ttn-mqtt broker");
 
                 _stack = nullptr;
-                _stack = new SCHC_TTN_MQTT_Stack();
-                SCHC_TTN_MQTT_Stack* stack_ttn_mqtt = dynamic_cast<SCHC_TTN_MQTT_Stack*>(_stack); 
+                _stack = new SCHC_GW_TTN_MQTT_Stack();
+                SCHC_GW_TTN_MQTT_Stack* stack_ttn_mqtt = dynamic_cast<SCHC_GW_TTN_MQTT_Stack*>(_stack); 
                 stack_ttn_mqtt->set_mqtt_stack(_mosq);
                 stack_ttn_mqtt->initialize_stack();
 
@@ -51,12 +51,12 @@ uint8_t SCHC_Fragmenter_GW::initialize(uint8_t protocol, uint8_t ack_mode, uint8
         return 0;
 }
 
-uint8_t SCHC_Fragmenter_GW::listen_messages(char *buffer)
+uint8_t SCHC_GW_Fragmenter::listen_messages(char *buffer)
 {
         SPDLOG_DEBUG(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
         SPDLOG_TRACE("\033[1mEntering the function\033[0m");
 
-        SCHC_TTN_Parser parser;
+        SCHC_GW_TTN_Parser parser;
         parser.initialize_parser(buffer);
         SPDLOG_DEBUG("Receiving messages from: {}", parser.get_device_id());
 
@@ -98,7 +98,7 @@ uint8_t SCHC_Fragmenter_GW::listen_messages(char *buffer)
         return 0;
 }
 
-int SCHC_Fragmenter_GW::get_free_session_id(uint8_t direction)
+int SCHC_GW_Fragmenter::get_free_session_id(uint8_t direction)
 {
         if(_protocol==SCHC_FRAG_LORAWAN && direction==SCHC_FRAG_UP)
         {
@@ -116,7 +116,7 @@ int SCHC_Fragmenter_GW::get_free_session_id(uint8_t direction)
         return -1;
 }
 
-uint8_t SCHC_Fragmenter_GW::associate_session_id(std::string deviceId, int sessionId)
+uint8_t SCHC_GW_Fragmenter::associate_session_id(std::string deviceId, int sessionId)
 {
         auto result = _associationMap.insert({deviceId, sessionId});
         if (result.second)
@@ -130,7 +130,7 @@ uint8_t SCHC_Fragmenter_GW::associate_session_id(std::string deviceId, int sessi
         }
 }
 
-uint8_t SCHC_Fragmenter_GW::disassociate_session_id(std::string deviceId)
+uint8_t SCHC_GW_Fragmenter::disassociate_session_id(std::string deviceId)
 {
         std::this_thread::sleep_for(std::chrono::seconds(10));
         size_t res = _associationMap.erase(deviceId);
@@ -147,7 +147,7 @@ uint8_t SCHC_Fragmenter_GW::disassociate_session_id(std::string deviceId)
         return -1;
 }
 
-int SCHC_Fragmenter_GW::get_session_id(std::string deviceId)
+int SCHC_GW_Fragmenter::get_session_id(std::string deviceId)
 {
         auto it = _associationMap.find(deviceId);
         if (it != _associationMap.end())
