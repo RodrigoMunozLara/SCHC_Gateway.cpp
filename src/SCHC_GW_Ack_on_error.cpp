@@ -359,8 +359,8 @@ uint8_t SCHC_GW_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, 
         }
         else if(msg_type == SCHC_ALL1_FRAGMENT_MSG)
         {
-            SPDLOG_WARN("\033[31mMessage discarded due to error probability\033[0m");   
-            return 0;
+            // SPDLOG_WARN("\033[31mMessage discarded due to error probability\033[0m");   
+            // return 0;
 
             /* Una forma de saber que la ventana de transmisión 
              ya ha finalizado es recibiendo un All-1. En ese caso 
@@ -413,11 +413,12 @@ uint8_t SCHC_GW_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, 
                 _bitmapArray[w][_windowSize-1] = 1;
 
                 SPDLOG_DEBUG("Sending SCHC ACK");
-                SCHC_GW_Message    encoder;
-                uint8_t c                   = 0;
-                vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
-                int len;
-                char* buffer                = nullptr;
+                SCHC_GW_Message         encoder;
+                int                     len;
+                uint8_t c               = 0;
+                vector bitmap_vector    = this->get_bitmap_array_vec(w); 
+                char* buffer            = nullptr;
+
                 encoder.create_schc_ack(_ruleID, dtag, w, c, bitmap_vector, buffer, len, false);
 
                 _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
@@ -523,7 +524,6 @@ uint8_t SCHC_GW_Ack_on_error::RX_RCV_WIN_recv_fragments(int rule_id, char *msg, 
                
             }
             
-
         }
         else
         {
@@ -1252,12 +1252,12 @@ uint8_t SCHC_GW_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id
                 SPDLOG_DEBUG("Sending SCHC ACK");
                 SCHC_GW_Message         encoder;
                 int                     len;
-                uint8_t c               = 1;                     // obtiene el valor de c en base al _bitmap_array
+                uint8_t c               = 1;
                 vector bitmap_vector    = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
                 char* buffer            = nullptr;
 
                 encoder.create_schc_ack(_ruleID, dtag, w, c, bitmap_vector, buffer, len);
-                
+
                 _stack->send_downlink_frame(_dev_id, SCHC_FRAG_UPDIR_RULE_ID, buffer, len);
                 delete[] buffer;
 
@@ -1280,11 +1280,11 @@ uint8_t SCHC_GW_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id
 
                 SPDLOG_DEBUG("Sending SCHC ACK");
 
-                SCHC_GW_Message    encoder;
-                uint8_t c                   = 0;
-                vector bitmap_vector   = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
-                int len;
-                char* buffer                = nullptr;
+                SCHC_GW_Message         encoder;
+                int                     len;
+                uint8_t c               = 0;
+                vector bitmap_vector    = this->get_bitmap_array_vec(w); // obtiene el bitmap expresado como un arreglo de char    
+                char* buffer            = nullptr;
 
                 encoder.create_schc_ack(_ruleID, dtag, w, c, bitmap_vector, buffer, len, false);
 
@@ -1306,7 +1306,7 @@ uint8_t SCHC_GW_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id
                 SPDLOG_DEBUG("Receiving SCHC ACK REQ");
 
                 decoder.decode_message(SCHC_FRAG_LORAWAN, rule_id, msg, len);
-                w               = decoder.get_w();
+                w = decoder.get_w();
 
                 spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
                 SPDLOG_WARN("|--- ACK REQ, W={:<1} -->| pull ACK REQ discarded", w);
@@ -1330,6 +1330,16 @@ uint8_t SCHC_GW_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id
                     el fin de la ventana debido a la pérdida de algun mensaje.
                     Por lo tanto c = 0 */
 
+                SPDLOG_DEBUG("Receiving SCHC ACK REQ");
+
+                decoder.decode_message(SCHC_FRAG_LORAWAN, rule_id, msg, len);
+                w = decoder.get_w();
+
+                spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t] %v");
+                SPDLOG_WARN("|--- ACK REQ, W={:<1} -->|", w);
+                spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
+
+
                 SPDLOG_DEBUG("Sending SCHC ACK");
                 SCHC_GW_Message         encoder;
                 int                     len;
@@ -1347,7 +1357,6 @@ uint8_t SCHC_GW_Ack_on_error::RX_WAIT_x_MISSING_FRAGS_recv_fragments(int rule_id
                 spdlog::set_pattern("[%H:%M:%S.%e][%^%L%$][%t][%-8!s][%-8!!] %v");
 
                 _wait_pull_ack_req_flag = true;
-
 
             }
 
